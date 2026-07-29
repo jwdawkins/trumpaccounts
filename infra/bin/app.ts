@@ -27,6 +27,7 @@ new ApiStack(app, stackName(cfg, "api"), {
   userPool: auth.userPool,
   userPoolClient: auth.userPoolClient,
   corsOrigins: ["http://localhost:5173"],
+  webBaseUrl: "http://localhost:5173",
 });
 
 // Consistent tags across every resource for cost allocation & ownership.

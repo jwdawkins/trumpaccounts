@@ -57,6 +57,40 @@ export class Repo {
     await this.doc.send(new TransactWriteCommand({ TransactItems: items }));
   }
 
+  /** Overwrite an order item (e.g. status/stripe ids after payment). */
+  async saveOrder(order: Order): Promise<void> {
+    await this.doc.send(
+      new PutCommand({ TableName: this.table, Item: this.orderItem(order) }),
+    );
+  }
+
+  /**
+   * Idempotency guard for webhook processing. Returns true if this eventId was
+   * newly marked (safe to process), false if already seen (skip — §8/§6.2).
+   */
+  async markEventProcessed(eventId: string, ttlDays = 30): Promise<boolean> {
+    const ttl = Math.floor(Date.now() / 1000) + ttlDays * 86400;
+    try {
+      await this.doc.send(
+        new PutCommand({
+          TableName: this.table,
+          Item: {
+            PK: `STRIPE_EVT#${eventId}`,
+            SK: "META",
+            entityType: "EVENT" as EntityType,
+            processedAt: new Date().toISOString(),
+            ttl,
+          },
+          ConditionExpression: "attribute_not_exists(PK)",
+        }),
+      );
+      return true;
+    } catch (e) {
+      if ((e as { name?: string }).name === "ConditionalCheckFailedException") return false;
+      throw e;
+    }
+  }
+
   async appendEvent(event: CardEvent): Promise<void> {
     await this.doc.send(
       new PutCommand({
