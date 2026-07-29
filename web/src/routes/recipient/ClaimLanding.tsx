@@ -113,6 +113,20 @@ function GiftCardPicker({ token, onDone }: { token: string; onDone: () => void }
 function TrumpLink({ token, state, onDone }: { token: string; state: string; onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pasted, setPasted] = useState("");
+
+  async function link(payload: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await claimApi.link(token, payload);
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -121,11 +135,17 @@ function TrumpLink({ token, state, onDone }: { token: string; state: string; onD
     setError(null);
     try {
       const payload = await decodeQrFromImage(file);
-      if (!payload) throw new Error("Couldn't read a QR code in that image — try a clearer photo.");
+      if (!payload) {
+        throw new Error(
+          "Couldn't read a QR code from that image. Try a clearer, straight-on photo — or paste your account link/code below instead.",
+        );
+      }
       await claimApi.link(token, payload);
       onDone();
-    } catch (e) {
-      setError((e as Error).message);
+    } catch {
+      setError(
+        "Couldn't read a QR code from that image (some phone photos, like HEIC, don't decode). Paste your account link or code below instead.",
+      );
     } finally {
       setBusy(false);
     }
@@ -144,16 +164,48 @@ function TrumpLink({ token, state, onDone }: { token: string; state: string; onD
     }
   }
 
+  async function submitPaste(e: React.FormEvent) {
+    e.preventDefault();
+    if (!pasted.trim()) return;
+    await link(pasted.trim());
+  }
+
+  const input =
+    "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
       <h2 className="text-lg font-semibold">2. Link your Trump Account</h2>
       <p className="mt-1 text-sm text-slate-600">
-        Upload a photo of your Trump Account QR code to link it.
+        Upload a photo of your Trump Account QR code, or paste the account link/code.
       </p>
+
       <label className="mt-3 block cursor-pointer rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 hover:border-blue-400">
         <input type="file" accept="image/*" className="hidden" onChange={onFile} disabled={busy} />
-        {busy ? "Reading…" : "Tap to upload QR photo"}
+        {busy ? "Working…" : "Tap to upload QR photo"}
       </label>
+
+      <div className="my-4 flex items-center gap-3 text-xs uppercase text-slate-400">
+        <span className="h-px flex-1 bg-slate-200" /> or paste <span className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <form onSubmit={submitPaste} className="space-y-2">
+        <input
+          className={input}
+          placeholder="Paste your Trump Account link or code"
+          value={pasted}
+          onChange={(e) => setPasted(e.target.value)}
+          disabled={busy}
+        />
+        <button
+          type="submit"
+          disabled={busy || !pasted.trim()}
+          className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          Link account
+        </button>
+      </form>
+
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       {state === "OPEN" ? (
