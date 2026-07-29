@@ -129,25 +129,30 @@ function TrumpLink({ token, state, onDone }: { token: string; state: string; onD
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const inputEl = e.target;
+    const file = inputEl.files?.[0];
     if (!file) return;
     setBusy(true);
     setError(null);
     try {
-      const payload = await decodeQrFromImage(file);
+      let payload: string | null;
+      try {
+        payload = await decodeQrFromImage(file);
+      } catch {
+        setError("That image couldn't be opened (HEIC isn't supported). Export it as PNG/JPEG, or paste your link/code below.");
+        return;
+      }
       if (!payload) {
-        throw new Error(
-          "Couldn't read a QR code from that image. Try a clearer, straight-on photo — or paste your account link/code below instead.",
-        );
+        setError("No QR code found in that image. Make sure the whole QR is visible and in focus, or paste your link/code below.");
+        return;
       }
       await claimApi.link(token, payload);
       onDone();
-    } catch {
-      setError(
-        "Couldn't read a QR code from that image (some phone photos, like HEIC, don't decode). Paste your account link or code below instead.",
-      );
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setBusy(false);
+      inputEl.value = ""; // allow re-selecting the same file after a fix
     }
   }
 
