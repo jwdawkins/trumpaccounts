@@ -35,6 +35,15 @@ export function History() {
       .catch((e) => setError((e as Error).message));
   }, [authLoading, email]);
 
+  async function downloadCert(cardId: string) {
+    try {
+      const blob = await api.downloadCertificate(cardId);
+      window.open(URL.createObjectURL(blob), "_blank");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
   if (!authLoading && !email) {
     return <p className="text-slate-600">Sign in from checkout to view your gift history.</p>;
   }
@@ -60,7 +69,17 @@ export function History() {
                   {formatCents(c.totalAmount)}
                   {c.recipientName ? ` · ${c.recipientName}` : ""} · {c.trumpPercent}% Trump
                 </span>
-                <Badge status={c.status} />
+                <div className="flex items-center gap-3">
+                  {c.deliveryMethod === "SELF" && c.status !== "Processing" && (
+                    <button
+                      onClick={() => downloadCert(c.cardId)}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Download certificate
+                    </button>
+                  )}
+                  <Badge status={c.status} />
+                </div>
               </li>
             ))}
           </ul>

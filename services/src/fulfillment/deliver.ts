@@ -1,16 +1,21 @@
 import { Card } from "../domain/types";
+import { sendClaimEmail } from "../notify/email";
+import { generateCertificatePdf } from "../notify/pdf";
+import { storeCertificate } from "../notify/store";
 
-/** Build the recipient claim URL from a raw token (never logged with PII). */
+/** Build the recipient claim URL from a raw token. */
 export function claimUrl(webBaseUrl: string, rawToken: string): string {
   return `${webBaseUrl.replace(/\/$/, "")}/claim/${rawToken}`;
 }
 
 /**
- * Dispatch a claim link to the recipient (handoff §6.4 / D2).
+ * Dispatch a claim to the recipient by the card's delivery method (§6.4 / D2):
+ *   EMAIL → SES email with the claim link
+ *   SELF  → generate a PDF gift certificate (QR of the claim link) → private S3
+ *   SMS   → ON HOLD (logged) until Twilio is wired
  *
- * M2 STUB: logs the delivery intent only. #12 replaces this with the real
- * NotificationProvider (SES email / Twilio SMS / generated PDF for SELF),
- * keeping this call-site stable. No card amounts in any subject line (§8).
+ * The raw token is used here and never persisted (§8); for SELF it lives only
+ * inside the stored certificate PDF in the private, encrypted assets bucket.
  */
 export async function dispatchDelivery(
   card: Card,
@@ -18,15 +23,37 @@ export async function dispatchDelivery(
   webBaseUrl: string,
 ): Promise<void> {
   const url = claimUrl(webBaseUrl, rawToken);
-  // Deliberately avoid logging the raw token in production paths; dev-only trace.
-  console.log(
-    JSON.stringify({
-      msg: "delivery.dispatch (stub)",
-      cardId: card.cardId,
-      method: card.deliveryMethod,
-      hasEmail: Boolean(card.recipientEmail),
-      hasPhone: Boolean(card.recipientPhone),
-      claimUrlPreview: `${url.slice(0, url.length - 8)}…`,
-    }),
-  );
+
+  switch (card.deliveryMethod) {
+    case "EMAIL": {
+      if (!card.recipientEmail) return;
+      await sendClaimEmail({
+        to: card.recipientEmail,
+        fromAddress: requireEnv("SES_FROM_ADDRESS"),
+        recipientName: card.recipientName,
+        claimUrl: url,
+      });
+      return;
+    }
+    case "SELF": {
+      const pdf = await generateCertificatePdf({
+        recipientName: card.recipientName,
+        message: card.message,
+        amountCents: card.totalAmount,
+        claimUrl: url,
+      });
+      await storeCertificate(requireEnv("ASSETS_BUCKET"), card.cardId, pdf);
+      return;
+    }
+    case "SMS": {
+      console.log(JSON.stringify({ msg: "SMS delivery on hold (Twilio pending)", cardId: card.cardId }));
+      return;
+    }
+  }
+}
+
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) throw new Error(`missing env ${name}`);
+  return v;
 }

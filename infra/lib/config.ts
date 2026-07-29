@@ -13,6 +13,8 @@ export interface EnvConfig {
   readonly region: string;
   /** Whether this is a throwaway/dev environment (looser removal policies). */
   readonly isEphemeral: boolean;
+  /** Verified SES sender address for claim emails (must be verified in SES). */
+  readonly sesFromAddress: string;
 }
 
 export const APP_NAME = "gift-platform";
@@ -33,6 +35,7 @@ export function resolveEnv(): EnvConfig {
     account,
     region,
     isEphemeral: stage !== "prod",
+    sesFromAddress: process.env.SES_FROM_ADDRESS ?? "no-reply@example.com",
   };
 }
 

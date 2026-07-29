@@ -9,6 +9,7 @@ const cfg: EnvConfig = {
   account: "111111111111",
   region: "us-east-2",
   isEphemeral: true,
+  sesFromAddress: "no-reply@example.com",
 };
 
 function synth(): Template {

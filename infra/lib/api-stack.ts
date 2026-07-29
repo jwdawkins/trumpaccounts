@@ -4,7 +4,10 @@ import * as path from "path";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as cognito from "aws-cdk-lib/aws-cognito";
 import * as sqs from "aws-cdk-lib/aws-sqs";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
+import { RemovalPolicy } from "aws-cdk-lib";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
@@ -73,6 +76,16 @@ export class ApiStack extends Stack {
       deadLetterQueue: { queue: webhookDlq, maxReceiveCount: 5 },
     });
 
+    // Private, encrypted bucket for generated assets (SELF gift-cert PDFs).
+    const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
+      bucketName: `${APP_NAME}-${cfg.stage}-assets-${cfg.account}`,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+      removalPolicy: cfg.isEphemeral ? RemovalPolicy.DESTROY : RemovalPolicy.RETAIN,
+      autoDeleteObjects: cfg.isEphemeral,
+    });
+
     const makeFn = (
       fnId: string,
       entryFile: string,
@@ -106,19 +119,37 @@ export class ApiStack extends Stack {
     });
     const webhookProcessorFn = makeFn("WebhookProcessorFn", "stripe-webhook-processor.ts", {
       WEB_BASE_URL: webBaseUrl,
+      SES_FROM_ADDRESS: cfg.sesFromAddress,
+      ASSETS_BUCKET: assetsBucket.bucketName,
     });
     webhookProcessorFn.addEventSource(
       new SqsEventSource(webhookQueue, { batchSize: 10, reportBatchItemFailures: true }),
     );
+
+    const getCertificateFn = makeFn("GetCertificateFn", "get-certificate.ts", {
+      ASSETS_BUCKET: assetsBucket.bucketName,
+    });
 
     // --- least-privilege grants ---
     table.grantReadWriteData(createOrderFn);
     table.grantReadData(listOrdersFn);
     table.grantReadWriteData(checkoutFn);
     table.grantReadWriteData(webhookProcessorFn);
+    table.grantReadData(getCertificateFn);
     this.stripeSecret.grantRead(checkoutFn);
     this.stripeSecret.grantRead(webhookReceiverFn);
     webhookQueue.grantSendMessages(webhookReceiverFn);
+    assetsBucket.grantPut(webhookProcessorFn);
+    assetsBucket.grantRead(getCertificateFn);
+    // SES send, scoped to the verified sender identity.
+    webhookProcessorFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["ses:SendEmail"],
+        resources: [
+          `arn:aws:ses:${cfg.region}:${cfg.account}:identity/${cfg.sesFromAddress}`,
+        ],
+      }),
+    );
 
     const authorizer = new HttpJwtAuthorizer(
       "CognitoAuthorizer",
@@ -152,6 +183,12 @@ export class ApiStack extends Stack {
       path: "/checkout",
       methods: [HttpMethod.POST],
       integration: new HttpLambdaIntegration("CheckoutInt", checkoutFn),
+      authorizer,
+    });
+    this.httpApi.addRoutes({
+      path: "/cards/{cardId}/certificate",
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration("GetCertificateInt", getCertificateFn),
       authorizer,
     });
     // Public — Stripe calls this; the signature check is the auth.

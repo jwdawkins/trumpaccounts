@@ -68,4 +68,11 @@ export const api = {
       body: JSON.stringify({ orderId }),
     }),
   listOrders: () => req<{ orders: OrderSummary[] }>("/orders"),
+  downloadCertificate: async (cardId: string): Promise<Blob> => {
+    const res = await fetch(`${config.apiUrl}/cards/${cardId}/certificate`, {
+      headers: await authHeader(),
+    });
+    if (!res.ok) throw new Error(`Certificate unavailable (HTTP ${res.status})`);
+    return res.blob();
+  },
 };
