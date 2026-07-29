@@ -70,7 +70,7 @@ export function History() {
                   {c.recipientName ? ` · ${c.recipientName}` : ""} · {c.trumpPercent}% Trump
                 </span>
                 <div className="flex items-center gap-3">
-                  {c.deliveryMethod === "SELF" && c.status !== "Processing" && (
+                  {c.status !== "Processing" && (
                     <button
                       onClick={() => downloadCert(c.cardId)}
                       className="text-xs text-blue-600 hover:underline"
