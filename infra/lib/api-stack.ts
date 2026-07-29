@@ -12,7 +12,7 @@ import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { HttpApi, HttpMethod, CorsHttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
-import { HttpJwtAuthorizer } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
+import { HttpJwtAuthorizer, HttpLambdaAuthorizer, HttpLambdaResponseType } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import { EnvConfig, APP_NAME } from "./config";
 
@@ -130,12 +130,18 @@ export class ApiStack extends Stack {
       ASSETS_BUCKET: assetsBucket.bucketName,
     });
 
+    // Recipient claim handlers (claim-token auth, no Cognito).
+    const claimAuthorizerFn = makeFn("ClaimAuthorizerFn", "claim-authorizer.ts");
+    const claimDetailsFn = makeFn("ClaimDetailsFn", "claim-details.ts");
+
     // --- least-privilege grants ---
     table.grantReadWriteData(createOrderFn);
     table.grantReadData(listOrdersFn);
     table.grantReadWriteData(checkoutFn);
     table.grantReadWriteData(webhookProcessorFn);
     table.grantReadData(getCertificateFn);
+    table.grantReadData(claimAuthorizerFn);
+    table.grantReadData(claimDetailsFn);
     this.stripeSecret.grantRead(checkoutFn);
     this.stripeSecret.grantRead(webhookReceiverFn);
     webhookQueue.grantSendMessages(webhookReceiverFn);
@@ -156,6 +162,12 @@ export class ApiStack extends Stack {
       `https://cognito-idp.${cfg.region}.amazonaws.com/${userPool.userPoolId}`,
       { jwtAudience: [userPoolClient.userPoolClientId] },
     );
+
+    // Claim-token authorizer: token in the x-claim-token header (§8).
+    const claimAuthorizer = new HttpLambdaAuthorizer("ClaimAuthorizer", claimAuthorizerFn, {
+      responseTypes: [HttpLambdaResponseType.SIMPLE],
+      identitySource: ["$request.header.x-claim-token"],
+    });
 
     this.httpApi = new HttpApi(this, "HttpApi", {
       apiName: `${APP_NAME}-${cfg.stage}`,
@@ -191,6 +203,14 @@ export class ApiStack extends Stack {
       integration: new HttpLambdaIntegration("GetCertificateInt", getCertificateFn),
       authorizer,
     });
+    // Recipient claim routes — claim-token auth (no Cognito).
+    this.httpApi.addRoutes({
+      path: "/claim/details",
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration("ClaimDetailsInt", claimDetailsFn),
+      authorizer: claimAuthorizer,
+    });
+
     // Public — Stripe calls this; the signature check is the auth.
     this.httpApi.addRoutes({
       path: "/webhooks/stripe",
