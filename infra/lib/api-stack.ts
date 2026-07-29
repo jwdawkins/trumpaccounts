@@ -133,6 +133,10 @@ export class ApiStack extends Stack {
     // Recipient claim handlers (claim-token auth, no Cognito).
     const claimAuthorizerFn = makeFn("ClaimAuthorizerFn", "claim-authorizer.ts");
     const claimDetailsFn = makeFn("ClaimDetailsFn", "claim-details.ts");
+    const claimCatalogFn = makeFn("ClaimCatalogFn", "claim-catalog.ts");
+    const claimSelectFn = makeFn("ClaimSelectFn", "claim-select.ts");
+    const claimLinkFn = makeFn("ClaimLinkFn", "claim-link.ts");
+    const claimNoAccountFn = makeFn("ClaimNoAccountFn", "claim-no-account.ts");
 
     // --- least-privilege grants ---
     table.grantReadWriteData(createOrderFn);
@@ -142,6 +146,10 @@ export class ApiStack extends Stack {
     table.grantReadData(getCertificateFn);
     table.grantReadData(claimAuthorizerFn);
     table.grantReadData(claimDetailsFn);
+    table.grantReadData(claimCatalogFn);
+    table.grantReadWriteData(claimSelectFn);
+    table.grantReadWriteData(claimLinkFn);
+    table.grantReadWriteData(claimNoAccountFn);
     this.stripeSecret.grantRead(checkoutFn);
     this.stripeSecret.grantRead(webhookReceiverFn);
     webhookQueue.grantSendMessages(webhookReceiverFn);
@@ -174,7 +182,7 @@ export class ApiStack extends Stack {
       corsPreflight: {
         allowOrigins: corsOrigins,
         allowMethods: [CorsHttpMethod.GET, CorsHttpMethod.POST, CorsHttpMethod.OPTIONS],
-        allowHeaders: ["authorization", "content-type", "idempotency-key"],
+        allowHeaders: ["authorization", "content-type", "idempotency-key", "x-claim-token"],
         maxAge: Duration.hours(1),
       },
     });
@@ -204,12 +212,24 @@ export class ApiStack extends Stack {
       authorizer,
     });
     // Recipient claim routes — claim-token auth (no Cognito).
-    this.httpApi.addRoutes({
-      path: "/claim/details",
-      methods: [HttpMethod.GET],
-      integration: new HttpLambdaIntegration("ClaimDetailsInt", claimDetailsFn),
-      authorizer: claimAuthorizer,
-    });
+    const claimRoute = (
+      routeId: string,
+      path: string,
+      method: HttpMethod,
+      fn: NodejsFunction,
+    ) =>
+      this.httpApi.addRoutes({
+        path,
+        methods: [method],
+        integration: new HttpLambdaIntegration(routeId, fn),
+        authorizer: claimAuthorizer,
+      });
+
+    claimRoute("ClaimDetailsInt", "/claim/details", HttpMethod.GET, claimDetailsFn);
+    claimRoute("ClaimCatalogInt", "/claim/catalog", HttpMethod.GET, claimCatalogFn);
+    claimRoute("ClaimSelectInt", "/claim/select", HttpMethod.POST, claimSelectFn);
+    claimRoute("ClaimLinkInt", "/claim/link", HttpMethod.POST, claimLinkFn);
+    claimRoute("ClaimNoAccountInt", "/claim/no-account", HttpMethod.POST, claimNoAccountFn);
 
     // Public — Stripe calls this; the signature check is the auth.
     this.httpApi.addRoutes({

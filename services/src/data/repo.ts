@@ -64,6 +64,13 @@ export class Repo {
     );
   }
 
+  /** Overwrite a card item (leg/attribute changes with no state transition). */
+  async saveCard(card: Card): Promise<void> {
+    await this.doc.send(
+      new PutCommand({ TableName: this.table, Item: this.cardItem(card) }),
+    );
+  }
+
   /**
    * Idempotency guard for webhook processing. Returns true if this eventId was
    * newly marked (safe to process), false if already seen (skip — §8/§6.2).
