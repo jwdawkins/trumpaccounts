@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Synth (infra)
+        run: npm run synth
+        env:
+          # Dummy env so `cdk synth` needs no AWS credentials in CI.
+          CDK_DEPLOY_ACCOUNT: "000000000000"
+          CDK_DEPLOY_REGION: us-east-2
+
+      - name: Build web
+        run: npm run build -w web

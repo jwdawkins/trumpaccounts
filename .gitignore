@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# CDK
+cdk.out/
+**/cdk.out/
+*.js.map
+cdk.context.json
+
+# build output
+dist/
+build/
+**/dist/
+**/build/
+*.tsbuildinfo
+
+# env & secrets (NEVER commit)
+.env
+.env.*
+!.env.example
+*.pem
+aws-exports.js
+
+# test / coverage
+coverage/
+.vitest/
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Claude Code local (personal) settings
+.claude/settings.local.json

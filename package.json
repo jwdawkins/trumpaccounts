@@ -1,0 +1,20 @@
+{
+  "name": "trump-gift-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Trump Account Gift Card Program — buyer/recipient/admin gift platform on AWS",
+  "workspaces": [
+    "infra",
+    "services",
+    "web"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "synth": "npm run synth -w infra",
+    "build": "npm run build --workspaces --if-present"
+  }
+}
