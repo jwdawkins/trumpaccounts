@@ -3,11 +3,13 @@ import { fetchAuthSession } from "aws-amplify/auth";
 
 export type TrumpPercent = 10 | 25 | 50 | 100;
 export type DeliveryMethod = "EMAIL" | "SMS" | "SELF";
+export type VerificationMode = "OPEN" | "VERIFIED";
 
 export interface CartItemInput {
   totalAmount: number; // cents
   trumpPercent: TrumpPercent;
   allowedGiftCardProducts?: string[];
+  verificationMode: VerificationMode;
   recipientName?: string;
   message?: string;
   deliveryMethod: DeliveryMethod;

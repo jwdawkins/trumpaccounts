@@ -1,5 +1,5 @@
 import { useCart } from "../lib/cart";
-import { formatCents } from "../lib/format";
+import { formatCents, processingFeeCents } from "../lib/format";
 
 const DELIVERY_LABEL: Record<string, string> = {
   EMAIL: "Email",
@@ -47,10 +47,25 @@ export function CartPanel({ onCheckout }: { onCheckout: () => void }) {
           );
         })}
       </ul>
-      <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
-        <span className="text-sm text-slate-600">Total</span>
-        <span className="text-lg font-semibold">{formatCents(totalCents)}</span>
-      </div>
+      {(() => {
+        const fee = processingFeeCents(totalCents, lines.length);
+        return (
+          <div className="mt-4 space-y-1 border-t border-slate-200 pt-4 text-sm">
+            <div className="flex items-center justify-between text-slate-600">
+              <span>Subtotal</span>
+              <span>{formatCents(totalCents)}</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-600">
+              <span>Processing fee</span>
+              <span>{formatCents(fee)}</span>
+            </div>
+            <div className="flex items-center justify-between pt-1 text-base font-semibold">
+              <span>Total</span>
+              <span>{formatCents(totalCents + fee)}</span>
+            </div>
+          </div>
+        );
+      })()}
       <button
         onClick={onCheckout}
         className="mt-4 w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"

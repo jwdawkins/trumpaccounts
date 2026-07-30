@@ -6,6 +6,7 @@ import {
   BatchGetCommand,
   TransactWriteCommand,
   PutCommand,
+  ScanCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { Order, Card, CardEvent } from "../domain/types";
 import { CardState, assertTransition } from "../domain/states";
@@ -228,6 +229,22 @@ export class Repo {
     );
     const item = r.Items?.[0];
     return item ? this.toCard(item) : undefined;
+  }
+
+  /**
+   * Cards whose scheduled Trump-funding retry is due (trumpFundingRetryAt <= now).
+   * Table Scan with a filter — fine at dev scale; add a GSI before prod volume.
+   */
+  async listFundingRetriesDue(nowIso: string): Promise<Card[]> {
+    const r = await this.doc.send(
+      new ScanCommand({
+        TableName: this.table,
+        FilterExpression:
+          "entityType = :card AND attribute_exists(trumpFundingRetryAt) AND trumpFundingRetryAt <= :now",
+        ExpressionAttributeValues: { ":card": "CARD", ":now": nowIso },
+      }),
+    );
+    return (r.Items ?? []).map((i) => this.toCard(i));
   }
 
   /** Full audit timeline for a card (admin drill-in). */

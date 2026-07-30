@@ -3,6 +3,7 @@ import {
   GiftCardProduct,
   CreateGiftCardOrder,
   GiftCardOrderResult,
+  classifyProduct,
 } from "./provider";
 
 export type TremendousEnvironment = "sandbox" | "production";
@@ -44,7 +45,11 @@ interface TremOrder {
   id: string;
   status: string;
   rewards?: TremReward[];
+  payment?: { subtotal?: number; fees?: number; total?: number };
 }
+
+const toCents = (dollars: number | undefined): number | undefined =>
+  typeof dollars === "number" ? Math.round(dollars * 100) : undefined;
 
 /**
  * Tremendous-backed gift-card provider (handoff §6.3). Catalog from GET /products,
@@ -96,12 +101,21 @@ export class TremendousGiftCardProvider implements GiftCardProvider {
     const reward = created.rewards?.[0];
     let link = reward?.delivery?.link;
 
-    // For LINK delivery the URL may not be inlined on the create response; read it back.
-    if (order.delivery === "LINK" && !link && reward?.id) {
+    // Always resolve the redemption link (needed for inline reveal regardless of
+    // delivery method); the create response often omits it.
+    if (!link && reward?.id) {
       link = await this.getRewardLink(reward.id);
     }
 
-    return { orderId: created.id, rewardId: reward?.id, status: created.status, link };
+    return {
+      orderId: created.id,
+      rewardId: reward?.id,
+      status: created.status,
+      link,
+      recipientCents: toCents(created.payment?.subtotal),
+      feeCents: toCents(created.payment?.fees),
+      totalCents: toCents(created.payment?.total),
+    };
   }
 
   private async getRewardLink(rewardId: string): Promise<string | undefined> {
@@ -155,6 +169,7 @@ function toProduct(p: TremProduct): GiftCardProduct {
     name: p.name,
     popular: POPULAR_BRANDS.some((b) => nameLower.includes(b)),
     category: p.category,
+    ...classifyProduct(p.category, p.name),
     minCents: mins.length ? Math.round(Math.min(...mins) * 100) : undefined,
     maxCents: maxes.length ? Math.round(Math.max(...maxes) * 100) : undefined,
     imageUrl: p.images?.find((i) => i.src)?.src,

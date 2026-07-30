@@ -1,7 +1,7 @@
 import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
 import { Repo } from "../data/repo";
 import { CardState, TrumpLeg } from "../domain/states";
-import { matchNames } from "../domain/verification";
+import { matchNames, isOpenGift } from "../domain/verification";
 import { newEventId } from "../domain/tokens";
 import { json } from "./http";
 import { requireAdmin } from "./admin-helpers";
@@ -35,9 +35,11 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
     return json(409, { message: `card is not awaiting verification (trumpLeg ${card.trumpLeg})` });
   }
 
-  const outcome = matchNames(card.recipientName, accountHolderName, {
-    requireWhenAbsent: REQUIRE_NAME_WHEN_ABSENT,
-  });
+  // OPEN gifts skip the name check entirely (post to any account); VERIFIED gifts
+  // must match the recipient name against the account holder.
+  const outcome = isOpenGift(card.verificationMode, card.recipientName)
+    ? "SKIPPED"
+    : matchNames(card.recipientName, accountHolderName, { requireWhenAbsent: REQUIRE_NAME_WHEN_ABSENT });
   const now = new Date().toISOString();
   const actor = `admin:${admin.adminId}`;
 

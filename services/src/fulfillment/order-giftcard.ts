@@ -3,6 +3,7 @@ import { Card } from "../domain/types";
 import { CardState, GiftCardLeg, TrumpLeg, legsSatisfyComplete, isTerminal } from "../domain/states";
 import { newEventId } from "../domain/tokens";
 import { GiftCardOrderer, GiftCardDelivery } from "../giftcards/provider";
+import { recipientDenominationCents } from "../giftcards/fees";
 
 export type OrderOutcome =
   | { status: "delivered"; completed: boolean; tremendousOrderId: string; link?: string }
@@ -44,13 +45,16 @@ export async function placeGiftCardOrder(
 
   const recipientEmail = card.recipientEmail ?? overrideEmail;
   const delivery: GiftCardDelivery = recipientEmail ? "EMAIL" : "LINK";
+  // Reduce the recipient's payout by the fee for cash-out types so our cost stays
+  // at the budgeted gift amount (fee-free types get the full amount).
+  const denomination = recipientDenominationCents(card.selectedGiftCardCategory, card.giftCardAmount);
 
   let order;
   try {
     order = await orderer.createOrder({
       externalId: cardId, // idempotency at the provider
       productId: card.selectedGiftCardProduct,
-      amountCents: card.giftCardAmount,
+      amountCents: denomination,
       recipientName: card.recipientName ?? "Gift recipient",
       recipientEmail,
       delivery,
@@ -69,8 +73,11 @@ export async function placeGiftCardOrder(
     tremendousOrderId: order.orderId,
     tremendousRewardId: order.rewardId,
     ...(order.link ? { tremendousRewardLink: order.link } : {}),
+    ...(order.feeCents !== undefined ? { tremendousFeeCents: order.feeCents } : {}),
+    ...(order.recipientCents !== undefined ? { tremendousRecipientCents: order.recipientCents } : {}),
   };
-  const reason = `gift card ordered via Tremendous (${order.orderId}, ${delivery})`;
+  const feeNote = order.feeCents ? `, fee ${order.feeCents}¢` : "";
+  const reason = `gift card ordered via Tremendous (${order.orderId}, ${delivery}, net ${order.recipientCents ?? denomination}¢${feeNote})`;
   const completes = legsSatisfyComplete(GiftCardLeg.DELIVERED, card.trumpLeg) && !isTerminal(card.state);
 
   if (completes) {

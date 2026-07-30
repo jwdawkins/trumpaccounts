@@ -39,6 +39,25 @@ export function splitCents(totalCents: number, pct: TrumpPercent): Split {
   return { trumpCents, giftCardCents };
 }
 
+/**
+ * Buyer processing fee (§7.1), charged on top of the gift subtotal:
+ *   2.9% of the whole order subtotal + $2.50 for the first gift + $1.00 each
+ *   additional gift. Rounded to the nearest cent. Returns 0 for an empty cart.
+ */
+export const PROCESSING_FEE = {
+  rate: 0.029,
+  firstGiftCents: 250,
+  additionalGiftCents: 100,
+} as const;
+
+export function processingFeeCents(subtotalCents: number, giftCount: number): number {
+  assertCents(subtotalCents, "subtotalCents");
+  if (giftCount <= 0) return 0;
+  const pct = Math.round(subtotalCents * PROCESSING_FEE.rate);
+  const fixed = PROCESSING_FEE.firstGiftCents + PROCESSING_FEE.additionalGiftCents * (giftCount - 1);
+  return pct + fixed;
+}
+
 export function dollarsToCents(dollars: number): number {
   // Route through rounding to avoid float artefacts (e.g. 1.1 * 100 = 110.000001).
   return Math.round(dollars * 100);

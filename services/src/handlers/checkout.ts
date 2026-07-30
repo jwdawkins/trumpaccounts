@@ -40,13 +40,21 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
   const idempotencyKey =
     (event.headers?.["idempotency-key"] as string | undefined) ?? `checkout-${orderId}`;
 
+  const giftLineItems = found.cards.map((c) => ({
+    name: `Gift${c.recipientName ? ` for ${c.recipientName}` : ""} (${formatCents(c.totalAmount)})`,
+    amountCents: c.totalAmount,
+    quantity: 1,
+  }));
+  // Processing fee as its own line item, charged on top (§7.1).
+  const feeCents = found.order.processingFeeCents ?? 0;
+  const lineItems =
+    feeCents > 0
+      ? [...giftLineItems, { name: "Processing fee", amountCents: feeCents, quantity: 1 }]
+      : giftLineItems;
+
   const { url, sessionId } = await provider.createCheckoutSession({
     orderId,
-    lineItems: found.cards.map((c) => ({
-      name: `Gift${c.recipientName ? ` for ${c.recipientName}` : ""} (${formatCents(c.totalAmount)})`,
-      amountCents: c.totalAmount,
-      quantity: 1,
-    })),
+    lineItems,
     successUrl: `${WEB_BASE_URL}/?checkout=success&order=${orderId}`,
     cancelUrl: `${WEB_BASE_URL}/?checkout=cancel&order=${orderId}`,
     idempotencyKey,

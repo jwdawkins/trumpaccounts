@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CartItemInput, TrumpPercent, DeliveryMethod, CatalogProduct, getCatalog } from "../lib/api";
+import { CartItemInput, TrumpPercent, DeliveryMethod, VerificationMode, CatalogProduct, getCatalog } from "../lib/api";
 import { dollarsToCents } from "../lib/format";
 
 const PERCENTS: TrumpPercent[] = [10, 25, 50, 100];
@@ -11,12 +11,15 @@ export function GiftForm({ onAdd }: { onAdd: (item: CartItemInput) => void }) {
   // Popular gift-card options (real Tremendous product ids) fetched from GET /catalog (§7.1).
   const [popular, setPopular] = useState<CatalogProduct[]>([]);
   const [recipientChoice, setRecipientChoice] = useState(true);
+  const [verificationMode, setVerificationMode] = useState<VerificationMode>("VERIFIED");
   const [recipientName, setRecipientName] = useState("");
   const [message, setMessage] = useState("");
   const [delivery, setDelivery] = useState<DeliveryMethod>("EMAIL");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const isVerified = verificationMode === "VERIFIED";
 
   const is100 = trumpPercent === 100;
 
@@ -34,6 +37,8 @@ export function GiftForm({ onAdd }: { onAdd: (item: CartItemInput) => void }) {
     setError(null);
     const cents = dollarsToCents(Number(amount));
     if (!Number.isFinite(cents) || cents < 100) return setError("Enter an amount of at least $1.00");
+    if (isVerified && !recipientName.trim())
+      return setError("A verified gift needs the recipient's name (it must match their Trump Account)");
     if (delivery === "EMAIL" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
       return setError("A valid recipient email is required for email delivery");
     if (delivery === "SMS" && !phone.trim())
@@ -43,7 +48,9 @@ export function GiftForm({ onAdd }: { onAdd: (item: CartItemInput) => void }) {
       totalAmount: cents,
       trumpPercent,
       allowedGiftCardProducts: is100 || recipientChoice ? [] : products,
-      recipientName: recipientName.trim() || undefined,
+      verificationMode,
+      // No recipient name on an open gift.
+      recipientName: isVerified ? recipientName.trim() || undefined : undefined,
       message: message.trim() || undefined,
       deliveryMethod: delivery,
       recipientEmail: delivery === "EMAIL" ? email.trim() : undefined,
@@ -135,11 +142,42 @@ export function GiftForm({ onAdd }: { onAdd: (item: CartItemInput) => void }) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className={label}>Recipient name (optional)</label>
-          <input className={input} value={recipientName} onChange={(e) => setRecipientName(e.target.value)} />
+      <div>
+        <label className={label}>Gift type</label>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {([
+            { mode: "VERIFIED", title: "Verified", desc: "Recipient name must match the Trump Account" },
+            { mode: "OPEN", title: "Open", desc: "Post to anyone's Trump Account — no name check" },
+          ] as const).map((opt) => (
+            <button
+              type="button"
+              key={opt.mode}
+              onClick={() => setVerificationMode(opt.mode)}
+              className={`rounded-md border px-3 py-2 text-left text-sm ${
+                verificationMode === opt.mode
+                  ? "border-blue-600 bg-blue-50"
+                  : "border-slate-300 hover:border-slate-400"
+              }`}
+            >
+              <span className="block font-medium text-slate-800">{opt.title}</span>
+              <span className="block text-xs text-slate-500">{opt.desc}</span>
+            </button>
+          ))}
         </div>
+      </div>
+
+      <div className={`grid gap-4 ${isVerified ? "grid-cols-2" : "grid-cols-1"}`}>
+        {isVerified && (
+          <div>
+            <label className={label}>Recipient name</label>
+            <input
+              className={input}
+              value={recipientName}
+              onChange={(e) => setRecipientName(e.target.value)}
+              placeholder="Must match their Trump Account"
+            />
+          </div>
+        )}
         <div>
           <label className={label}>Delivery</label>
           <select className={input} value={delivery} onChange={(e) => setDelivery(e.target.value as DeliveryMethod)}>

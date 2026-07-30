@@ -14,6 +14,8 @@ import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { HttpApi, HttpMethod, CorsHttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpJwtAuthorizer, HttpLambdaAuthorizer, HttpLambdaResponseType } from "aws-cdk-lib/aws-apigatewayv2-authorizers";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import * as events from "aws-cdk-lib/aws-events";
+import * as targets from "aws-cdk-lib/aws-events-targets";
 import { EnvConfig, APP_NAME } from "./config";
 
 export interface ApiStackProps extends StackProps {
@@ -119,6 +121,22 @@ export class ApiStack extends Stack {
       deadLetterQueue: { queue: giftcardDlq, maxReceiveCount: 5 },
     });
 
+    // Trump-Account funding buffer: claim-link enqueues here on link; the async
+    // funding worker auto-verifies + contributes. FIFO per-card group.
+    const fundingDlq = new sqs.Queue(this, "TrumpFundingDlq", {
+      queueName: `${APP_NAME}-${cfg.stage}-trump-funding-dlq.fifo`,
+      fifo: true,
+      contentBasedDeduplication: false,
+      retentionPeriod: Duration.days(14),
+    });
+    const fundingQueue = new sqs.Queue(this, "TrumpFundingQueue", {
+      queueName: `${APP_NAME}-${cfg.stage}-trump-funding.fifo`,
+      fifo: true,
+      contentBasedDeduplication: false,
+      visibilityTimeout: Duration.seconds(60), // spacing between quick retries
+      deadLetterQueue: { queue: fundingDlq, maxReceiveCount: 3 },
+    });
+
     // Private, encrypted bucket for generated assets (SELF gift-cert PDFs).
     const assetsBucket = new s3.Bucket(this, "AssetsBucket", {
       bucketName: `${APP_NAME}-${cfg.stage}-assets-${cfg.account}`,
@@ -142,7 +160,9 @@ export class ApiStack extends Stack {
         timeout: Duration.seconds(15),
         environment: { TABLE_NAME: table.tableName, ...env },
         bundling: {
-          externalModules: ["@aws-sdk/*"], // provided by the runtime; stripe IS bundled
+          // @aws-sdk/* is provided by the runtime; playwright-core is only used by
+          // the container-image funding worker, never the zip Lambdas. stripe IS bundled.
+          externalModules: ["@aws-sdk/*", "playwright-core"],
           minify: true,
           sourceMap: true,
           target: "node22",
@@ -183,8 +203,13 @@ export class ApiStack extends Stack {
     const claimAuthorizerFn = makeFn("ClaimAuthorizerFn", "claim-authorizer.ts");
     const claimDetailsFn = makeFn("ClaimDetailsFn", "claim-details.ts");
     const claimCatalogFn = makeFn("ClaimCatalogFn", "claim-catalog.ts", catalogEnv);
-    const claimSelectFn = makeFn("ClaimSelectFn", "claim-select.ts", catalogEnv);
-    const claimLinkFn = makeFn("ClaimLinkFn", "claim-link.ts");
+    const claimSelectFn = makeFn("ClaimSelectFn", "claim-select.ts", {
+      ...catalogEnv,
+      GIFTCARD_QUEUE_URL: giftcardQueue.queueUrl,
+    });
+    const claimLinkFn = makeFn("ClaimLinkFn", "claim-link.ts", {
+      FUNDING_QUEUE_URL: fundingQueue.queueUrl,
+    });
     const claimNoAccountFn = makeFn("ClaimNoAccountFn", "claim-no-account.ts");
 
     // Async gift-card order worker — holds the ORDER key; no HTTP route.
@@ -194,6 +219,25 @@ export class ApiStack extends Stack {
     giftcardOrderWorkerFn.addEventSource(
       new SqsEventSource(giftcardQueue, { batchSize: 5, reportBatchItemFailures: true }),
     );
+
+    // Async Trump-funding worker (SQS-triggered) — auto-verify + contribute.
+    // batchSize 1 so ApproximateReceiveCount tracks per-card quick retries cleanly.
+    const trumpFundingWorkerFn = makeFn("TrumpFundingWorkerFn", "trump-funding-worker.ts", {
+      GIFTCARD_QUEUE_URL: giftcardQueue.queueUrl,
+    });
+    trumpFundingWorkerFn.addEventSource(
+      new SqsEventSource(fundingQueue, { batchSize: 1, reportBatchItemFailures: true }),
+    );
+
+    // Scheduled sweeper — re-enqueues due funding retries (every 30 min).
+    const trumpFundingSweeperFn = makeFn("TrumpFundingSweeperFn", "trump-funding-sweeper.ts", {
+      FUNDING_QUEUE_URL: fundingQueue.queueUrl,
+    });
+    new events.Rule(this, "TrumpFundingSweepRule", {
+      ruleName: `${APP_NAME}-${cfg.stage}-trump-funding-sweep`,
+      schedule: events.Schedule.rate(Duration.minutes(30)),
+      targets: [new targets.LambdaFunction(trumpFundingSweeperFn)],
+    });
 
     // Admin ops (verification & fulfillment). Cognito JWT + admins-group check.
     // adminGiftcardFn only ENQUEUES — it gets the queue URL, never the order key.
@@ -221,6 +265,11 @@ export class ApiStack extends Stack {
     table.grantReadWriteData(adminGiftcardFn);
     table.grantReadWriteData(adminTransferFn);
     table.grantReadWriteData(giftcardOrderWorkerFn);
+    table.grantReadWriteData(trumpFundingWorkerFn);
+    table.grantReadWriteData(trumpFundingSweeperFn);
+    // claim-link + sweeper enqueue funding jobs.
+    fundingQueue.grantSendMessages(claimLinkFn);
+    fundingQueue.grantSendMessages(trumpFundingSweeperFn);
     this.stripeSecret.grantRead(checkoutFn);
     this.stripeSecret.grantRead(webhookReceiverFn);
     // Read-only catalog key → synchronous web/claim paths only.
@@ -230,6 +279,9 @@ export class ApiStack extends Stack {
     // Order key → the async worker ONLY. adminGiftcardFn just enqueues.
     this.tremendousOrdersSecret.grantRead(giftcardOrderWorkerFn);
     giftcardQueue.grantSendMessages(adminGiftcardFn);
+    // Auto-fulfill triggers enqueue gift-card orders too.
+    giftcardQueue.grantSendMessages(claimSelectFn);
+    giftcardQueue.grantSendMessages(trumpFundingWorkerFn);
     webhookQueue.grantSendMessages(webhookReceiverFn);
     assetsBucket.grantPut(webhookProcessorFn);
     assetsBucket.grantRead(getCertificateFn);

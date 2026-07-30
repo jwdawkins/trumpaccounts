@@ -25,6 +25,16 @@ describe("validateCartItem (D2/D3)", () => {
       validateCartItem({ totalAmount: 2500, trumpPercent: 25, deliveryMethod: "SELF" }),
     ).not.toThrow();
   });
+  it("a VERIFIED gift requires a recipient name", () => {
+    expect(() =>
+      validateCartItem({ ...base, verificationMode: "VERIFIED", recipientName: undefined }),
+    ).toThrow(/name/i);
+  });
+  it("an OPEN gift needs no name", () => {
+    expect(() =>
+      validateCartItem({ totalAmount: 5000, trumpPercent: 50, deliveryMethod: "SELF", verificationMode: "OPEN" }),
+    ).not.toThrow();
+  });
   it("rejects bad percentages and sub-dollar amounts", () => {
     expect(() => validateCartItem({ ...base, trumpPercent: 30 })).toThrow();
     expect(() => validateCartItem({ ...base, totalAmount: 50 })).toThrow();
@@ -67,5 +77,28 @@ describe("buildOrderFromCart", () => {
 
   it("rejects an empty cart", () => {
     expect(() => buildOrderFromCart("buyer-1", [])).toThrow(CartValidationError);
+  });
+});
+
+describe("verification mode (OPEN vs VERIFIED)", () => {
+  it("OPEN gift carries no recipient name even if one is passed", () => {
+    const { cards } = buildOrderFromCart("b", [
+      { totalAmount: 5000, trumpPercent: 50, deliveryMethod: "SELF", verificationMode: "OPEN", recipientName: "Ignored" },
+    ]);
+    expect(cards[0].verificationMode).toBe("OPEN");
+    expect(cards[0].recipientName).toBeUndefined();
+  });
+  it("VERIFIED gift keeps the recipient name", () => {
+    const { cards } = buildOrderFromCart("b", [
+      { totalAmount: 5000, trumpPercent: 50, deliveryMethod: "SELF", verificationMode: "VERIFIED", recipientName: "Sam" },
+    ]);
+    expect(cards[0].verificationMode).toBe("VERIFIED");
+    expect(cards[0].recipientName).toBe("Sam");
+  });
+  it("defaults to OPEN when no name and no mode given", () => {
+    const { cards } = buildOrderFromCart("b", [
+      { totalAmount: 5000, trumpPercent: 50, deliveryMethod: "SELF" },
+    ]);
+    expect(cards[0].verificationMode).toBe("OPEN");
   });
 });

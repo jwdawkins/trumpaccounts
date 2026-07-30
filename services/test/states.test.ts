@@ -90,14 +90,19 @@ describe("fulfillment legs (§4.2)", () => {
 });
 
 describe("buyer status mapping (§4/§7.1)", () => {
-  it("maps CLAIMED and AWAITING_TRUMP_ACCOUNT both to Pending (D6)", () => {
-    expect(buyerStatus(CardState.CLAIMED)).toBe("Pending");
-    expect(buyerStatus(CardState.AWAITING_TRUMP_ACCOUNT)).toBe("Pending");
+  it("reflects Trump-account progress within CLAIMED via the trump leg", () => {
+    expect(buyerStatus(CardState.CLAIMED, TrumpLeg.LINKED)).toBe("Trump Account Pending");
+    expect(buyerStatus(CardState.CLAIMED, TrumpLeg.VERIFIED)).toBe("Trump Account Pending");
+    expect(buyerStatus(CardState.CLAIMED, TrumpLeg.TRANSFER_INITIATED)).toBe("Transferring");
+    expect(buyerStatus(CardState.CLAIMED, TrumpLeg.MISMATCH)).toBe("Needs attention");
+  });
+  it("maps AWAITING_TRUMP_ACCOUNT to its own label", () => {
+    expect(buyerStatus(CardState.AWAITING_TRUMP_ACCOUNT)).toBe("Awaiting Trump Account");
   });
   it("maps terminal + open states directly", () => {
     expect(buyerStatus(CardState.OPEN)).toBe("Open");
     expect(buyerStatus(CardState.COMPLETE)).toBe("Complete");
-    expect(buyerStatus(CardState.UNVERIFIED)).toBe("Unverified");
+    expect(buyerStatus(CardState.UNVERIFIED)).toBe("Needs attention");
     expect(buyerStatus(CardState.REFUNDED)).toBe("Refunded");
   });
 });

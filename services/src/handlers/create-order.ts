@@ -53,6 +53,8 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
     return json(201, {
       orderId: order.orderId,
       totalAmount: order.totalAmount,
+      processingFeeCents: order.processingFeeCents,
+      grandTotal: order.totalAmount + order.processingFeeCents,
       cardIds: order.cardIds,
       status: order.status,
     });

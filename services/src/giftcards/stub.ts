@@ -3,6 +3,7 @@ import {
   GiftCardProduct,
   CreateGiftCardOrder,
   GiftCardOrderResult,
+  classifyProduct,
 } from "./provider";
 
 /**
@@ -10,14 +11,23 @@ import {
  * is configured (§6.3). Popular products are pinned first; createOrder simulates
  * a placed reward so the state machine can be exercised end-to-end offline.
  */
-const CATALOG: GiftCardProduct[] = [
-  { id: "TREM_STARBUCKS", name: "Starbucks", popular: true },
-  { id: "TREM_AMAZON", name: "Amazon", popular: true },
-  { id: "TREM_PREPAID_VISA", name: "Prepaid Visa", popular: true },
-  { id: "TREM_TARGET", name: "Target", popular: false },
-  { id: "TREM_WALMART", name: "Walmart", popular: false },
-  { id: "TREM_DOORDASH", name: "DoorDash", popular: false },
+const RAW: { id: string; name: string; popular: boolean; category: string }[] = [
+  { id: "TREM_STARBUCKS", name: "Starbucks", popular: true, category: "merchant_card" },
+  { id: "TREM_AMAZON", name: "Amazon", popular: true, category: "merchant_card" },
+  { id: "TREM_VIRTUAL_VISA", name: "Virtual Visa", popular: true, category: "visa_card" },
+  { id: "TREM_TARGET", name: "Target", popular: false, category: "merchant_card" },
+  { id: "TREM_VENMO", name: "Venmo", popular: false, category: "venmo" },
+  { id: "TREM_CHARITY", name: "Red Cross", popular: false, category: "charity" },
 ];
+const CATALOG: GiftCardProduct[] = RAW.map((p) => ({
+  id: p.id,
+  name: p.name,
+  popular: p.popular,
+  category: p.category,
+  ...classifyProduct(p.category, p.name),
+  minCents: 100,
+  maxCents: 200000,
+}));
 
 export class StubGiftCardProvider implements GiftCardProvider {
   async listCatalog(): Promise<GiftCardProduct[]> {
@@ -29,7 +39,10 @@ export class StubGiftCardProvider implements GiftCardProvider {
       orderId: `SIM-${order.externalId.slice(0, 8)}`,
       rewardId: `SIM-RWD-${order.externalId.slice(0, 8)}`,
       status: "EXECUTED",
-      link: order.delivery === "LINK" ? `https://example.test/reward/${order.externalId}` : undefined,
+      link: `https://example.test/reward/${order.externalId}`,
+      recipientCents: order.amountCents,
+      feeCents: 0,
+      totalCents: order.amountCents,
     };
   }
 }

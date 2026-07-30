@@ -34,7 +34,7 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
       giftCardAmount: c.giftCardAmount,
       recipientName: c.recipientName,
       deliveryMethod: c.deliveryMethod,
-      status: buyerStatus(c.state),
+      status: buyerStatus(c.state, c.trumpLeg),
     })),
   }));
 

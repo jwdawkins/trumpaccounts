@@ -78,6 +78,20 @@ describe("placeGiftCardOrder (§6.3 async worker)", () => {
     expect(saved[0].tremendousRewardLink).toBe("https://reward/x");
   });
 
+  it("cash-out category: denomination is reduced by the fee; net + fee stored", async () => {
+    const { repo, saved } = fakeRepo(makeCard({ selectedGiftCardCategory: "venmo", giftCardAmount: 7500 }));
+    const { orderer, calls } = fakeOrderer(async (o) => ({
+      orderId: "ORDV", rewardId: "RV", status: "EXECUTED",
+      recipientCents: o.amountCents, feeCents: 289, totalCents: o.amountCents + 289,
+    }));
+
+    await placeGiftCardOrder(repo, orderer, "card-1");
+
+    expect(calls[0].amountCents).toBe(7211); // 7500 / 1.04 floored
+    expect(saved[0].tremendousRecipientCents).toBe(7211);
+    expect(saved[0].tremendousFeeCents).toBe(289);
+  });
+
   it("is idempotent — a DELIVERED card is skipped without ordering", async () => {
     const { repo } = fakeRepo(makeCard({ giftCardLeg: GiftCardLeg.DELIVERED, tremendousOrderId: "OLD" }));
     const { orderer, calls } = fakeOrderer(async () => ({ orderId: "X", status: "EXECUTED" }));

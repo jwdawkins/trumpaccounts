@@ -4,6 +4,14 @@ import { TrumpPercent } from "./money";
 /** How the claim link reaches the recipient (D2). */
 export type DeliveryMethod = "EMAIL" | "SMS" | "SELF";
 
+/**
+ * Gift verification mode (buyer's choice, §6.1):
+ *  - OPEN: no name check — the contribution posts to whatever Trump Account the
+ *    recipient links. No recipient name is collected.
+ *  - VERIFIED: the recipient name must match the linked Trump Account holder.
+ */
+export type VerificationMode = "OPEN" | "VERIFIED";
+
 /** Order-level status mirrors payment lifecycle, not per-card fulfillment. */
 export type OrderStatus = "PENDING_PAYMENT" | "PAID" | "REFUNDED" | "CANCELLED";
 
@@ -12,8 +20,10 @@ export interface Order {
   readonly buyerId: string;
   readonly stripePaymentIntentId?: string;
   readonly stripeCheckoutSessionId?: string;
-  /** Sum of all card totals, integer cents. */
+  /** Sum of all card totals (gift subtotal), integer cents. */
   readonly totalAmount: number;
+  /** Buyer processing fee charged on top of the subtotal (§7.1), integer cents. */
+  readonly processingFeeCents: number;
   readonly status: OrderStatus;
   /** Ids of the cards in this order. */
   readonly cardIds: string[];
@@ -38,11 +48,15 @@ export interface Card {
   // Gift-card selection (empty allowed list = recipient's choice).
   readonly allowedGiftCardProducts: string[]; // Tremendous product IDs
   readonly selectedGiftCardProduct?: string;
+  /** Tremendous category of the selected product (drives fee handling). */
+  readonly selectedGiftCardCategory?: string;
 
   // Sender + recipient + delivery (D2/D3).
   /** Display name of the gifter shown to the recipient ("A gift from …"). */
   readonly fromName?: string;
   readonly recipientName?: string;
+  /** OPEN (no name check) or VERIFIED (name must match the account). */
+  readonly verificationMode?: VerificationMode;
   readonly message?: string;
   readonly deliveryMethod: DeliveryMethod;
   readonly recipientEmail?: string;
@@ -65,9 +79,15 @@ export interface Card {
   readonly tremendousOrderId?: string;
   /** Tremendous reward id within the order. */
   readonly tremendousRewardId?: string;
-  /** Redemption URL, stored only when the reward is delivered as a LINK. */
+  /** Redemption URL the recipient uses to claim/redeem the reward. */
   readonly tremendousRewardLink?: string;
+  /** Actual fee we paid (cents) and the net the recipient receives (cents). */
+  readonly tremendousFeeCents?: number;
+  readonly tremendousRecipientCents?: number;
   readonly trumpTransferRef?: string;
+  /** Async Trump-funding retry bookkeeping (long/scheduled retries). */
+  readonly trumpFundingAttempts?: number;
+  readonly trumpFundingRetryAt?: string; // ISO; a sweeper re-enqueues when due
 
   readonly createdAt: string;
   readonly updatedAt: string;

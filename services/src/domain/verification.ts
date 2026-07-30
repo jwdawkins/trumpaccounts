@@ -7,7 +7,19 @@
  * unless REQUIRE_NAME_MATCH_WHEN_ABSENT is set.
  */
 
+import { VerificationMode } from "./types";
+
 export type NameMatchOutcome = "MATCH" | "MISMATCH" | "SKIPPED";
+
+/**
+ * Is this an OPEN gift (no name check — post to any linked account)? Uses the
+ * explicit mode when set; for legacy cards without a mode, infers OPEN when no
+ * recipient name was provided (the old implicit behavior).
+ */
+export function isOpenGift(mode: VerificationMode | undefined, recipientName?: string): boolean {
+  if (mode) return mode === "OPEN";
+  return !recipientName || !recipientName.trim();
+}
 
 /** Normalize a name to lowercase alnum tokens for tolerant comparison. */
 export function nameTokens(s: string): string[] {

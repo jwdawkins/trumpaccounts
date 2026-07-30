@@ -1,6 +1,6 @@
-import { Order, Card, DeliveryMethod } from "./types";
+import { Order, Card, DeliveryMethod, VerificationMode } from "./types";
 import { CardState, GiftCardLeg, TrumpLeg } from "./states";
-import { TrumpPercent, isTrumpPercent, assertCents, splitCents } from "./money";
+import { TrumpPercent, isTrumpPercent, assertCents, splitCents, processingFeeCents } from "./money";
 import { newOrderId, newCardId } from "./tokens";
 
 /** One line item from the storefront cart (§7.1). Amounts are integer cents. */
@@ -9,11 +9,19 @@ export interface CartItemInput {
   trumpPercent: number;
   allowedGiftCardProducts?: string[];
   selectedGiftCardProduct?: string;
+  /** OPEN (no name check) or VERIFIED (name must match). Defaults from name presence. */
+  verificationMode?: VerificationMode;
   recipientName?: string;
   message?: string;
   deliveryMethod: DeliveryMethod;
   recipientEmail?: string;
   recipientPhone?: string;
+}
+
+/** Resolve the mode: explicit if given, else VERIFIED when a name is present. */
+function resolveMode(item: CartItemInput): VerificationMode {
+  if (item.verificationMode) return item.verificationMode;
+  return item.recipientName && item.recipientName.trim() ? "VERIFIED" : "OPEN";
 }
 
 export class CartValidationError extends Error {
@@ -39,6 +47,10 @@ export function validateCartItem(item: CartItemInput): void {
   }
   if (item.message && item.message.length > MAX_MESSAGE) {
     throw new CartValidationError(`message exceeds ${MAX_MESSAGE} chars`);
+  }
+  // A Verified gift must name the recipient (that name is matched to the account).
+  if (resolveMode(item) === "VERIFIED" && (!item.recipientName || !item.recipientName.trim())) {
+    throw new CartValidationError("A verified gift requires the recipient's name");
   }
   // Delivery method requirements (D2).
   switch (item.deliveryMethod) {
@@ -94,6 +106,9 @@ export function buildOrderFromCart(
     const pct = item.trumpPercent as TrumpPercent;
     const { trumpCents, giftCardCents } = splitCents(item.totalAmount, pct);
     const is100 = pct === 100;
+    const mode = resolveMode(item);
+    // OPEN gifts carry no recipient name (we don't ask for one).
+    const recipientName = mode === "OPEN" ? undefined : item.recipientName?.trim() || undefined;
     return {
       cardId: newCardId(),
       orderId,
@@ -105,7 +120,8 @@ export function buildOrderFromCart(
       allowedGiftCardProducts: is100 ? [] : item.allowedGiftCardProducts ?? [],
       selectedGiftCardProduct: undefined,
       fromName: opts.fromName,
-      recipientName: item.recipientName,
+      verificationMode: mode,
+      recipientName,
       message: item.message,
       deliveryMethod: item.deliveryMethod,
       recipientEmail: item.recipientEmail,
@@ -124,6 +140,7 @@ export function buildOrderFromCart(
     orderId,
     buyerId,
     totalAmount,
+    processingFeeCents: processingFeeCents(totalAmount, cards.length),
     status: "PENDING_PAYMENT",
     cardIds: cards.map((c) => c.cardId),
     acknowledgedAt: opts.acknowledgedAt,

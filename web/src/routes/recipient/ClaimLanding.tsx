@@ -25,6 +25,14 @@ export function ClaimLanding() {
     refresh();
   }, [refresh]);
 
+  // Auto-refresh while the backend is still working so the status advances live
+  // (verifying → contributing → complete) instead of looking hung.
+  useEffect(() => {
+    if (!details || details.complete || !details.inProgress) return;
+    const id = setInterval(refresh, 5000);
+    return () => clearInterval(id);
+  }, [details, refresh]);
+
   if (loading) return <p className="text-slate-500">Loading your gift…</p>;
   if (error || !details)
     return (
@@ -64,14 +72,20 @@ export function ClaimLanding() {
   );
 }
 
+const TYPE_ORDER = ["gift_card", "prepaid_visa", "cash_out", "donation"];
+
 function GiftCardPicker({ token, onDone }: { token: string; onDone: () => void }) {
   const [products, setProducts] = useState<CatalogProduct[]>([]);
+  const [budgetCents, setBudgetCents] = useState(0);
   const [choice, setChoice] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    claimApi.catalog(token).then((r) => setProducts(r.products)).catch((e) => setError((e as Error).message));
+    claimApi
+      .catalog(token)
+      .then((r) => { setProducts(r.products); setBudgetCents(r.budgetCents); })
+      .catch((e) => setError((e as Error).message));
   }, [token]);
 
   async function submit() {
@@ -88,15 +102,41 @@ function GiftCardPicker({ token, onDone }: { token: string; onDone: () => void }
     }
   }
 
+  // Group by type, in a stable order.
+  const groups = TYPE_ORDER.map((t) => ({
+    type: t,
+    label: products.find((p) => p.type === t)?.groupLabel ?? "",
+    items: products.filter((p) => p.type === t),
+  })).filter((g) => g.items.length > 0);
+
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
-      <h2 className="text-lg font-semibold">1. Choose your gift card</h2>
-      <div className="mt-3 space-y-2">
-        {products.map((p) => (
-          <label key={p.id} className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
-            <input type="radio" name="product" value={p.id} checked={choice === p.id} onChange={() => setChoice(p.id)} />
-            {p.name}
-          </label>
+      <h2 className="text-lg font-semibold">1. Choose how to receive {formatCents(budgetCents)}</h2>
+      <div className="mt-4 space-y-5">
+        {groups.map((g) => (
+          <div key={g.type}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{g.label}</p>
+            <div className="mt-2 space-y-2">
+              {g.items.map((p) => (
+                <label
+                  key={p.id}
+                  className={`flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm ${
+                    choice === p.id ? "border-blue-600 bg-blue-50" : "border-slate-200 hover:border-slate-300"
+                  }`}
+                >
+                  <input type="radio" name="product" value={p.id} checked={choice === p.id} onChange={() => setChoice(p.id)} />
+                  <span className="flex-1">
+                    <span className="font-medium text-slate-800">{p.name}</span>
+                    <span className="block text-xs text-slate-500">{p.deliveryNote}</span>
+                  </span>
+                  <span className="text-right text-xs">
+                    <span className="font-medium text-slate-700">{formatCents(p.netCents)}</span>
+                    {p.feeBearing && <span className="block text-[10px] text-amber-600">after fee</span>}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
@@ -229,24 +269,48 @@ function TrumpLink({ token, state, onDone }: { token: string; state: string; onD
   );
 }
 
+function StepIcon({ status }: { status: string }) {
+  const base = "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs";
+  if (status === "done") return <span className={`${base} bg-green-500 text-white`}>✓</span>;
+  if (status === "active")
+    return <span className={`${base} border-2 border-blue-500 border-t-transparent animate-spin`} aria-label="in progress" />;
+  if (status === "attention") return <span className={`${base} bg-amber-500 text-white`}>!</span>;
+  return <span className={`${base} border border-slate-300 text-transparent`}>•</span>;
+}
+
 function StatusChecklist({ details }: { details: ClaimDetails }) {
+  const textFor = (status: string) =>
+    status === "done" ? "text-slate-900"
+    : status === "active" ? "text-blue-700"
+    : status === "attention" ? "text-amber-700"
+    : "text-slate-400";
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-6">
-      <h2 className="text-lg font-semibold">Status</h2>
-      <ul className="mt-3 space-y-2">
+      <h2 className="text-lg font-semibold">{details.headline}</h2>
+      <ul className="mt-4 space-y-3">
         {details.checklist.map((s) => (
-          <li key={s.key} className="flex items-center gap-3 text-sm">
-            <span
-              className={`flex h-5 w-5 items-center justify-center rounded-full text-xs ${
-                s.done ? "bg-green-500 text-white" : "border border-slate-300 text-transparent"
-              }`}
-            >
-              ✓
-            </span>
-            <span className={s.done ? "text-slate-900" : "text-slate-500"}>{s.label}</span>
+          <li key={s.key} className="flex items-start gap-3 text-sm">
+            <StepIcon status={s.status} />
+            <div>
+              <p className={`font-medium ${textFor(s.status)}`}>{s.label}</p>
+              {s.detail && <p className="text-xs text-slate-500">{s.detail}</p>}
+              {s.rewardLink && (
+                <a
+                  href={s.rewardLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1 inline-block rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700"
+                >
+                  Reveal your gift →
+                </a>
+              )}
+            </div>
           </li>
         ))}
       </ul>
+      {details.inProgress && (
+        <p className="mt-4 text-xs text-slate-400">This updates automatically — no need to refresh.</p>
+      )}
     </section>
   );
 }

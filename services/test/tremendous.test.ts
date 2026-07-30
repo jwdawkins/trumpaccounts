@@ -61,7 +61,15 @@ describe("TremendousGiftCardProvider.createOrder", () => {
 
   it("EMAIL: sends denomination in dollars, funding source, recipient email; returns refs", async () => {
     const calls = mockFetch([
-      { body: { order: { id: "ORD1", status: "EXECUTED", rewards: [{ id: "RWD1" }] } } },
+      {
+        body: {
+          order: {
+            id: "ORD1", status: "EXECUTED",
+            rewards: [{ id: "RWD1", delivery: { link: "https://reward/1" } }],
+            payment: { subtotal: 25, fees: 0, total: 25 },
+          },
+        },
+      },
     ]);
     const provider = new TremendousGiftCardProvider(cfg);
     const res = await provider.createOrder({
@@ -73,7 +81,7 @@ describe("TremendousGiftCardProvider.createOrder", () => {
       delivery: "EMAIL",
     });
 
-    expect(res).toEqual({ orderId: "ORD1", rewardId: "RWD1", status: "EXECUTED", link: undefined });
+    expect(res).toMatchObject({ orderId: "ORD1", rewardId: "RWD1", status: "EXECUTED", link: "https://reward/1", recipientCents: 2500, feeCents: 0, totalCents: 2500 });
     const sent = JSON.parse(calls[0].init.body as string);
     expect(sent).toMatchObject({
       external_id: "card-123",
@@ -122,7 +130,7 @@ describe("TremendousGiftCardProvider.createOrder", () => {
   });
 
   it("uses the production base URL when configured", async () => {
-    const calls = mockFetch([{ body: { order: { id: "O", status: "EXECUTED", rewards: [{ id: "R" }] } } }]);
+    const calls = mockFetch([{ body: { order: { id: "O", status: "EXECUTED", rewards: [{ id: "R", delivery: { link: "https://reward/x" } }] } } }]);
     const provider = new TremendousGiftCardProvider({ ...cfg, environment: "production" });
     await provider.createOrder({
       externalId: "c", productId: "P", amountCents: 100, recipientName: "X",

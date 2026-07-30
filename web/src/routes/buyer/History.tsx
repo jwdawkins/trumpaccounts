@@ -5,9 +5,11 @@ import { formatCents } from "../../lib/format";
 
 const STATUS_STYLES: Record<string, string> = {
   Open: "bg-blue-50 text-blue-700",
-  Pending: "bg-amber-50 text-amber-700",
+  "Awaiting Trump Account": "bg-amber-50 text-amber-700",
+  "Trump Account Pending": "bg-amber-50 text-amber-700",
+  Transferring: "bg-indigo-50 text-indigo-700",
+  "Needs attention": "bg-red-50 text-red-700",
   Complete: "bg-green-50 text-green-700",
-  Unverified: "bg-red-50 text-red-700",
   Processing: "bg-slate-100 text-slate-600",
   Refunded: "bg-slate-100 text-slate-600",
   Voided: "bg-slate-100 text-slate-500",

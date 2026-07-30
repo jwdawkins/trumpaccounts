@@ -134,25 +134,35 @@ export function legsSatisfyComplete(giftCardLeg: GiftCardLeg, trumpLeg: TrumpLeg
 
 export type BuyerStatus =
   | "Open"
-  | "Pending"
+  | "Awaiting Trump Account"
+  | "Trump Account Pending"
+  | "Transferring"
+  | "Needs attention"
   | "Complete"
-  | "Unverified"
   | "Voided"
   | "Expired"
   | "Refunded"
   | "Processing";
 
-export function buyerStatus(state: CardState): BuyerStatus {
+/**
+ * Buyer-facing status (§4/§7.1). Reflects the Trump-Account funding progress so
+ * the gifter sees a meaningful state, not a generic "Pending". Derived from the
+ * card state plus the trump leg (which drives the CLAIMED sub-states).
+ */
+export function buyerStatus(state: CardState, trumpLeg: TrumpLeg = TrumpLeg.UNLINKED): BuyerStatus {
   switch (state) {
     case CardState.PENDING_PAYMENT:
       return "Processing"; // not normally shown to the buyer
     case CardState.OPEN:
       return "Open";
-    case CardState.CLAIMED:
     case CardState.AWAITING_TRUMP_ACCOUNT:
-      return "Pending"; // both internal states show as Pending (D6)
+      return "Awaiting Trump Account"; // opened, but recipient has no account yet
+    case CardState.CLAIMED:
+      if (trumpLeg === TrumpLeg.MISMATCH || trumpLeg === TrumpLeg.FAILED) return "Needs attention";
+      if (trumpLeg === TrumpLeg.TRANSFER_INITIATED || trumpLeg === TrumpLeg.TRANSFERRED) return "Transferring";
+      return "Trump Account Pending"; // linked/verifying, contribution not yet made
     case CardState.UNVERIFIED:
-      return "Unverified";
+      return "Needs attention";
     case CardState.COMPLETE:
       return "Complete";
     case CardState.VOIDED:
