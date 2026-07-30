@@ -40,6 +40,7 @@ export function ClaimLanding() {
       <section className="rounded-xl border border-slate-200 bg-white p-6 text-center">
         <h1 className="text-2xl font-semibold">You&rsquo;ve received a gift 🎁</h1>
         {details.recipientName && <p className="mt-1 text-slate-600">For {details.recipientName}</p>}
+        {details.fromName && <p className="text-sm text-slate-500">A gift from {details.fromName}</p>}
         <p className="mt-4 text-4xl font-bold text-blue-600">{formatCents(details.amount)}</p>
         <p className="mt-1 text-sm text-slate-500">
           {formatCents(details.trumpAmount)} to a Trump Account

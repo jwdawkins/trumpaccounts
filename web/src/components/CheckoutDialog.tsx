@@ -12,6 +12,7 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
   const [step, setStep] = useState<Step>(signedInEmail ? "acknowledge" : "email");
   const [email, setEmail] = useState(signedInEmail ?? "");
   const [code, setCode] = useState("");
+  const [fromName, setFromName] = useState("");
   const [ack, setAck] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +26,7 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
     let cancelled = false;
     (async () => {
       try {
-        const order = await api.createOrder(lines, true);
+        const order = await api.createOrder(lines, true, fromName.trim() || undefined);
         const { url } = await api.checkout(order.orderId);
         if (!cancelled) window.location.href = url;
       } catch (e) {
@@ -123,6 +124,18 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
 
         {step === "acknowledge" && (
           <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-slate-700">Your name (optional)</label>
+              <input
+                className={input}
+                placeholder="Shown to the recipient as “from …”"
+                value={fromName}
+                onChange={(e) => setFromName(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                Leave blank and we&rsquo;ll use your account name or email.
+              </p>
+            </div>
             <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
               Trump Account contribution:{" "}
               <span className="font-semibold text-slate-900">{formatCents(trumpTotal)}</span>

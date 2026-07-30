@@ -39,7 +39,9 @@ export interface Card {
   readonly allowedGiftCardProducts: string[]; // Tremendous product IDs
   readonly selectedGiftCardProduct?: string;
 
-  // Recipient + delivery (D2/D3).
+  // Sender + recipient + delivery (D2/D3).
+  /** Display name of the gifter shown to the recipient ("A gift from …"). */
+  readonly fromName?: string;
   readonly recipientName?: string;
   readonly message?: string;
   readonly deliveryMethod: DeliveryMethod;

@@ -11,6 +11,7 @@ export interface ClaimDetails {
   trumpAmount: number;
   giftCardAmount: number;
   trumpPercent: number;
+  fromName?: string;
   recipientName?: string;
   message?: string;
   needsGiftCardSelection: boolean;

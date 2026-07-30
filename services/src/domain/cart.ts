@@ -66,6 +66,8 @@ export function validateCartItem(item: CartItemInput): void {
  */
 export interface BuildOrderOptions {
   now?: Date;
+  /** Resolved gifter display name (typed name, login name, or email). */
+  fromName?: string;
   /** Timestamp the buyer acknowledged the irrevocable contribution (§9/O5). */
   acknowledgedAt?: string;
   ackVersion?: string;
@@ -102,6 +104,7 @@ export function buildOrderFromCart(
       giftCardAmount: giftCardCents,
       allowedGiftCardProducts: is100 ? [] : item.allowedGiftCardProducts ?? [],
       selectedGiftCardProduct: undefined,
+      fromName: opts.fromName,
       recipientName: item.recipientName,
       message: item.message,
       deliveryMethod: item.deliveryMethod,

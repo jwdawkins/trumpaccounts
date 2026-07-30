@@ -64,6 +64,7 @@ export function recipientDetails(card: Card) {
     trumpAmount: card.trumpAmount,
     giftCardAmount: card.giftCardAmount,
     trumpPercent: card.trumpPercent,
+    fromName: card.fromName,
     recipientName: card.recipientName,
     message: card.message,
     needsGiftCardSelection:
