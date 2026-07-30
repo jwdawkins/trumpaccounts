@@ -42,3 +42,6 @@ Thumbs.db
 
 # user-pasted screenshots (local only)
 Screenshot*.png
+
+# funding worker generated screenshots
+funding/*.png

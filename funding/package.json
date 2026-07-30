@@ -1,0 +1,14 @@
+{
+  "name": "@trump/funding-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Server-side headless-browser worker that funds a recipient's Trump Account via the Robinhood contribution link. Runs OUTSIDE the API Lambdas (needs Chromium).",
+  "scripts": {
+    "contribute": "node src/run.mjs",
+    "postinstall-browser": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}
