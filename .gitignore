@@ -39,3 +39,6 @@ Thumbs.db
 
 # Claude Code local (personal) settings
 .claude/settings.local.json
+
+# user-pasted screenshots (local only)
+Screenshot*.png

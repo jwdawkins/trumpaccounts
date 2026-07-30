@@ -182,22 +182,13 @@ function TrumpLink({ token, state, onDone }: { token: string; state: string; onD
     <section className="rounded-xl border border-slate-200 bg-white p-6">
       <h2 className="text-lg font-semibold">2. Link your Trump Account</h2>
       <p className="mt-1 text-sm text-slate-600">
-        Upload a photo of your Trump Account QR code, or paste the account link/code.
+        In your Trump Account app, tap <strong>Share link</strong> and paste it here.
       </p>
 
-      <label className="mt-3 block cursor-pointer rounded-md border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500 hover:border-blue-400">
-        <input type="file" accept="image/*" className="hidden" onChange={onFile} disabled={busy} />
-        {busy ? "Working…" : "Tap to upload QR photo"}
-      </label>
-
-      <div className="my-4 flex items-center gap-3 text-xs uppercase text-slate-400">
-        <span className="h-px flex-1 bg-slate-200" /> or paste <span className="h-px flex-1 bg-slate-200" />
-      </div>
-
-      <form onSubmit={submitPaste} className="space-y-2">
+      <form onSubmit={submitPaste} className="mt-3 space-y-2">
         <input
           className={input}
-          placeholder="Paste your Trump Account link or code"
+          placeholder="Paste your Trump Account link"
           value={pasted}
           onChange={(e) => setPasted(e.target.value)}
           disabled={busy}
@@ -207,9 +198,20 @@ function TrumpLink({ token, state, onDone }: { token: string; state: string; onD
           disabled={busy || !pasted.trim()}
           className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          Link account
+          {busy ? "Working…" : "Link account"}
         </button>
       </form>
+
+      <div className="my-4 flex items-center gap-3 text-xs uppercase text-slate-400">
+        <span className="h-px flex-1 bg-slate-200" /> or upload a QR photo <span className="h-px flex-1 bg-slate-200" />
+      </div>
+      <label className="block cursor-pointer rounded-md border border-dashed border-slate-300 p-3 text-center text-sm text-slate-500 hover:border-blue-400">
+        <input type="file" accept="image/*" className="hidden" onChange={onFile} disabled={busy} />
+        {busy ? "Working…" : "Choose a QR image"}
+      </label>
+      <p className="mt-1 text-xs text-slate-400">
+        Works best with a plain QR. Stylized codes may not scan — pasting the link is most reliable.
+      </p>
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
