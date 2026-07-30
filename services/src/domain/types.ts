@@ -17,6 +17,9 @@ export interface Order {
   readonly status: OrderStatus;
   /** Ids of the cards in this order. */
   readonly cardIds: string[];
+  /** Irrevocable-contribution acknowledgment (§9/O5) captured at checkout. */
+  readonly acknowledgedAt?: string;
+  readonly ackVersion?: string;
   readonly createdAt: string; // ISO-8601
   readonly updatedAt: string;
 }

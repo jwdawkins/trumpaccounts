@@ -15,16 +15,30 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
   if (!buyerId) return json(401, { message: "unauthenticated" });
 
   let items: CartItemInput[];
+  let acknowledged: boolean;
+  let ackVersion: string | undefined;
   try {
     const body = event.body ? JSON.parse(event.body) : {};
     items = body.items;
+    acknowledged = body.acknowledged === true;
+    ackVersion = typeof body.ackVersion === "string" ? body.ackVersion : undefined;
     if (!Array.isArray(items)) return json(400, { message: "body.items[] is required" });
   } catch {
     return json(400, { message: "invalid JSON body" });
   }
 
+  // Irrevocable-contribution acknowledgment is mandatory (§9/O5).
+  if (!acknowledged) {
+    return json(400, {
+      message: "You must acknowledge the irrevocable contribution to continue",
+    });
+  }
+
   try {
-    const { order, cards } = buildOrderFromCart(buyerId, items);
+    const { order, cards } = buildOrderFromCart(buyerId, items, {
+      acknowledgedAt: new Date().toISOString(),
+      ackVersion: ackVersion ?? "v1",
+    });
     await repo.putOrderWithCards(order, cards);
     return json(201, {
       orderId: order.orderId,

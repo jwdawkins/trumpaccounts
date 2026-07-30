@@ -64,11 +64,19 @@ export function validateCartItem(item: CartItemInput): void {
  * PENDING_PAYMENT; gift-card leg is NONE at 100% Trump (D5), else awaiting
  * selection; Trump leg is unlinked until the recipient claims.
  */
+export interface BuildOrderOptions {
+  now?: Date;
+  /** Timestamp the buyer acknowledged the irrevocable contribution (§9/O5). */
+  acknowledgedAt?: string;
+  ackVersion?: string;
+}
+
 export function buildOrderFromCart(
   buyerId: string,
   items: CartItemInput[],
-  now: Date = new Date(),
+  opts: BuildOrderOptions = {},
 ): { order: Order; cards: Card[] } {
+  const now = opts.now ?? new Date();
   if (items.length === 0) {
     throw new CartValidationError("cart is empty");
   }
@@ -115,6 +123,8 @@ export function buildOrderFromCart(
     totalAmount,
     status: "PENDING_PAYMENT",
     cardIds: cards.map((c) => c.cardId),
+    acknowledgedAt: opts.acknowledgedAt,
+    ackVersion: opts.ackVersion,
     createdAt: iso,
     updatedAt: iso,
   };

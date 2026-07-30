@@ -60,8 +60,11 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  createOrder: (items: CartItemInput[]) =>
-    req<CreateOrderResult>("/orders", { method: "POST", body: JSON.stringify({ items }) }),
+  createOrder: (items: CartItemInput[], acknowledged: boolean) =>
+    req<CreateOrderResult>("/orders", {
+      method: "POST",
+      body: JSON.stringify({ items, acknowledged, ackVersion: "v1" }),
+    }),
   checkout: (orderId: string) =>
     req<{ url: string; sessionId: string }>("/checkout", {
       method: "POST",
