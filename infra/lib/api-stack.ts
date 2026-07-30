@@ -138,6 +138,12 @@ export class ApiStack extends Stack {
     const claimLinkFn = makeFn("ClaimLinkFn", "claim-link.ts");
     const claimNoAccountFn = makeFn("ClaimNoAccountFn", "claim-no-account.ts");
 
+    // Admin ops (verification & fulfillment). Cognito JWT + admins-group check.
+    const adminVerifyFn = makeFn("AdminVerifyFn", "admin-verify.ts");
+    const adminMismatchFn = makeFn("AdminMismatchFn", "admin-mismatch.ts");
+    const adminGiftcardFn = makeFn("AdminGiftcardFn", "admin-fulfill-giftcard.ts");
+    const adminTransferFn = makeFn("AdminTransferFn", "admin-transfer.ts");
+
     // --- least-privilege grants ---
     table.grantReadWriteData(createOrderFn);
     table.grantReadData(listOrdersFn);
@@ -150,6 +156,10 @@ export class ApiStack extends Stack {
     table.grantReadWriteData(claimSelectFn);
     table.grantReadWriteData(claimLinkFn);
     table.grantReadWriteData(claimNoAccountFn);
+    table.grantReadWriteData(adminVerifyFn);
+    table.grantReadWriteData(adminMismatchFn);
+    table.grantReadWriteData(adminGiftcardFn);
+    table.grantReadWriteData(adminTransferFn);
     this.stripeSecret.grantRead(checkoutFn);
     this.stripeSecret.grantRead(webhookReceiverFn);
     webhookQueue.grantSendMessages(webhookReceiverFn);
@@ -230,6 +240,19 @@ export class ApiStack extends Stack {
     claimRoute("ClaimSelectInt", "/claim/select", HttpMethod.POST, claimSelectFn);
     claimRoute("ClaimLinkInt", "/claim/link", HttpMethod.POST, claimLinkFn);
     claimRoute("ClaimNoAccountInt", "/claim/no-account", HttpMethod.POST, claimNoAccountFn);
+
+    // Admin ops routes (Cognito JWT authorizer; handler enforces admins group).
+    const adminRoute = (routeId: string, path: string, fn: NodejsFunction) =>
+      this.httpApi.addRoutes({
+        path,
+        methods: [HttpMethod.POST],
+        integration: new HttpLambdaIntegration(routeId, fn),
+        authorizer,
+      });
+    adminRoute("AdminVerifyInt", "/admin/cards/{cardId}/verify", adminVerifyFn);
+    adminRoute("AdminMismatchInt", "/admin/cards/{cardId}/mismatch", adminMismatchFn);
+    adminRoute("AdminGiftcardInt", "/admin/cards/{cardId}/fulfill-giftcard", adminGiftcardFn);
+    adminRoute("AdminTransferInt", "/admin/cards/{cardId}/transfer", adminTransferFn);
 
     // Public — Stripe calls this; the signature check is the auth.
     this.httpApi.addRoutes({

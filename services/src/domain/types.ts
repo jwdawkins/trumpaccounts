@@ -57,6 +57,8 @@ export interface Card {
 
   // Fulfillment references.
   readonly linkedTrumpAccountRef?: string;
+  /** Name seen on the linked Trump Account when the admin verified it (D3). */
+  readonly verifiedAccountHolderName?: string;
   readonly mismatchDecision?: "ALLOW" | "DISALLOW";
   readonly tremendousOrderId?: string;
   readonly trumpTransferRef?: string;
