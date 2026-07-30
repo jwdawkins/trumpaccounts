@@ -1,20 +1,15 @@
-import { useState } from "react";
-import { CartItemInput, TrumpPercent, DeliveryMethod } from "../lib/api";
+import { useEffect, useState } from "react";
+import { CartItemInput, TrumpPercent, DeliveryMethod, CatalogProduct, getCatalog } from "../lib/api";
 import { dollarsToCents } from "../lib/format";
 
-// Popular gift-card options pinned first (§7.1). Real Tremendous product IDs
-// arrive with the catalog integration in M3; these are placeholders.
-const POPULAR = [
-  { id: "TREM_STARBUCKS", label: "Starbucks" },
-  { id: "TREM_AMAZON", label: "Amazon" },
-  { id: "TREM_PREPAID_VISA", label: "Prepaid Visa" },
-];
 const PERCENTS: TrumpPercent[] = [10, 25, 50, 100];
 
 export function GiftForm({ onAdd }: { onAdd: (item: CartItemInput) => void }) {
   const [amount, setAmount] = useState("50");
   const [trumpPercent, setTrumpPercent] = useState<TrumpPercent>(50);
   const [products, setProducts] = useState<string[]>([]);
+  // Popular gift-card options (real Tremendous product ids) fetched from GET /catalog (§7.1).
+  const [popular, setPopular] = useState<CatalogProduct[]>([]);
   const [recipientChoice, setRecipientChoice] = useState(true);
   const [recipientName, setRecipientName] = useState("");
   const [message, setMessage] = useState("");
@@ -24,6 +19,12 @@ export function GiftForm({ onAdd }: { onAdd: (item: CartItemInput) => void }) {
   const [error, setError] = useState<string | null>(null);
 
   const is100 = trumpPercent === 100;
+
+  useEffect(() => {
+    getCatalog()
+      .then(setPopular)
+      .catch(() => setPopular([])); // storefront still works with recipient's-choice default
+  }, []);
 
   const toggleProduct = (id: string) =>
     setProducts((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -112,7 +113,10 @@ export function GiftForm({ onAdd }: { onAdd: (item: CartItemInput) => void }) {
           </label>
           {!recipientChoice && (
             <div className="mt-2 flex flex-wrap gap-2">
-              {POPULAR.map((prod) => (
+              {popular.length === 0 && (
+                <p className="text-sm text-slate-500">Loading gift cards…</p>
+              )}
+              {popular.map((prod) => (
                 <button
                   type="button"
                   key={prod.id}
@@ -123,7 +127,7 @@ export function GiftForm({ onAdd }: { onAdd: (item: CartItemInput) => void }) {
                       : "border-slate-300 text-slate-600 hover:border-slate-400"
                   }`}
                 >
-                  {prod.label}
+                  {prod.name}
                 </button>
               ))}
             </div>

@@ -1,6 +1,6 @@
 import { APIGatewayProxyHandlerV2WithLambdaAuthorizer } from "aws-lambda";
 import { Repo } from "../data/repo";
-import { giftCards } from "../giftcards/stub";
+import { getGiftCardCatalog } from "../giftcards";
 import { GiftCardLeg } from "../domain/states";
 import { newEventId } from "../domain/tokens";
 import { json } from "./http";
@@ -30,7 +30,7 @@ export const handler: APIGatewayProxyHandlerV2WithLambdaAuthorizer<Ctx> = async 
     return json(409, { message: "this gift has no gift-card portion" });
   }
 
-  const catalog = await giftCards.listCatalog();
+  const catalog = await (await getGiftCardCatalog()).listCatalog();
   const allowed = card.allowedGiftCardProducts;
   const isValid =
     catalog.some((p) => p.id === productId) &&

@@ -63,6 +63,10 @@ export interface Card {
   readonly verifiedAccountHolderName?: string;
   readonly mismatchDecision?: "ALLOW" | "DISALLOW";
   readonly tremendousOrderId?: string;
+  /** Tremendous reward id within the order. */
+  readonly tremendousRewardId?: string;
+  /** Redemption URL, stored only when the reward is delivered as a LINK. */
+  readonly tremendousRewardLink?: string;
   readonly trumpTransferRef?: string;
 
   readonly createdAt: string;

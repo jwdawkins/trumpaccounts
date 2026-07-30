@@ -1,9 +1,14 @@
-import { GiftCardProvider, GiftCardProduct } from "./provider";
+import {
+  GiftCardProvider,
+  GiftCardProduct,
+  CreateGiftCardOrder,
+  GiftCardOrderResult,
+} from "./provider";
 
 /**
- * Stub catalog used until the Tremendous account/API is wired (§6.3).
- * Popular products (Starbucks, Amazon, Prepaid Visa) are pinned first, matching
- * the placeholder ids used by the storefront.
+ * Stub catalog + ordering used for local dev and tests when no Tremendous secret
+ * is configured (§6.3). Popular products are pinned first; createOrder simulates
+ * a placed reward so the state machine can be exercised end-to-end offline.
  */
 const CATALOG: GiftCardProduct[] = [
   { id: "TREM_STARBUCKS", name: "Starbucks", popular: true },
@@ -18,7 +23,16 @@ export class StubGiftCardProvider implements GiftCardProvider {
   async listCatalog(): Promise<GiftCardProduct[]> {
     return [...CATALOG].sort((a, b) => Number(b.popular) - Number(a.popular));
   }
+
+  async createOrder(order: CreateGiftCardOrder): Promise<GiftCardOrderResult> {
+    return {
+      orderId: `SIM-${order.externalId.slice(0, 8)}`,
+      rewardId: `SIM-RWD-${order.externalId.slice(0, 8)}`,
+      status: "EXECUTED",
+      link: order.delivery === "LINK" ? `https://example.test/reward/${order.externalId}` : undefined,
+    };
+  }
 }
 
-/** Shared default instance. */
+/** Shared default instance (used by giftcards/index.ts when no secret is set). */
 export const giftCards: GiftCardProvider = new StubGiftCardProvider();

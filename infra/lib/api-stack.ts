@@ -43,6 +43,10 @@ export interface ApiStackProps extends StackProps {
 export class ApiStack extends Stack {
   public readonly httpApi: HttpApi;
   public readonly stripeSecret: secretsmanager.Secret;
+  /** Read-only catalog key — web/claim/storefront paths. */
+  public readonly tremendousCatalogSecret: secretsmanager.Secret;
+  /** Order key — the async order-worker only. */
+  public readonly tremendousOrdersSecret: secretsmanager.Secret;
 
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, props);
@@ -61,6 +65,28 @@ export class ApiStack extends Stack {
       },
     });
 
+    // Tremendous credentials (§6.3) — TWO separate keys, so a compromised
+    // web-facing key can't move money. The read-only catalog key is used by the
+    // synchronous storefront/claim paths; the order key lives ONLY in the async
+    // order-worker. Real keys are pasted into these secrets in the AWS console.
+    this.tremendousCatalogSecret = new secretsmanager.Secret(this, "TremendousCatalogSecret", {
+      secretName: `${APP_NAME}-${cfg.stage}-tremendous-catalog`,
+      description: "Tremendous READ-ONLY catalog apiKey (set in console); used by web/claim paths",
+      secretObjectValue: {
+        apiKey: SecretValue.unsafePlainText("REPLACE_ME_tremendous_catalog_key"),
+        environment: SecretValue.unsafePlainText("sandbox"),
+      },
+    });
+    this.tremendousOrdersSecret = new secretsmanager.Secret(this, "TremendousOrdersSecret", {
+      secretName: `${APP_NAME}-${cfg.stage}-tremendous-orders`,
+      description: "Tremendous ORDER apiKey + fundingSourceId (set in console); async worker ONLY",
+      secretObjectValue: {
+        apiKey: SecretValue.unsafePlainText("REPLACE_ME_tremendous_order_key"),
+        environment: SecretValue.unsafePlainText("sandbox"),
+        fundingSourceId: SecretValue.unsafePlainText("BALANCE"),
+      },
+    });
+
     // Webhook buffer (FIFO so eventId dedup + ordering hold) with a DLQ.
     const webhookDlq = new sqs.Queue(this, "WebhookDlq", {
       queueName: `${APP_NAME}-${cfg.stage}-webhooks-dlq.fifo`,
@@ -74,6 +100,23 @@ export class ApiStack extends Stack {
       contentBasedDeduplication: false,
       visibilityTimeout: Duration.seconds(60),
       deadLetterQueue: { queue: webhookDlq, maxReceiveCount: 5 },
+    });
+
+    // Gift-card order buffer (§6.3): admin-fulfill enqueues here; the async
+    // order-worker drains it and places the Tremendous reward order. FIFO so a
+    // per-card group keeps ordering and a redelivery can't race itself.
+    const giftcardDlq = new sqs.Queue(this, "GiftcardOrderDlq", {
+      queueName: `${APP_NAME}-${cfg.stage}-giftcard-orders-dlq.fifo`,
+      fifo: true,
+      contentBasedDeduplication: false,
+      retentionPeriod: Duration.days(14),
+    });
+    const giftcardQueue = new sqs.Queue(this, "GiftcardOrderQueue", {
+      queueName: `${APP_NAME}-${cfg.stage}-giftcard-orders.fifo`,
+      fifo: true,
+      contentBasedDeduplication: false,
+      visibilityTimeout: Duration.seconds(90),
+      deadLetterQueue: { queue: giftcardDlq, maxReceiveCount: 5 },
     });
 
     // Private, encrypted bucket for generated assets (SELF gift-cert PDFs).
@@ -130,18 +173,35 @@ export class ApiStack extends Stack {
       ASSETS_BUCKET: assetsBucket.bucketName,
     });
 
+    // Read-only catalog env — only the synchronous web/claim paths get this.
+    const catalogEnv = { TREMENDOUS_CATALOG_SECRET_ARN: this.tremendousCatalogSecret.secretArn };
+
+    // Public storefront catalog (no auth) — buyers pin real Tremendous product ids.
+    const publicCatalogFn = makeFn("PublicCatalogFn", "public-catalog.ts", catalogEnv);
+
     // Recipient claim handlers (claim-token auth, no Cognito).
     const claimAuthorizerFn = makeFn("ClaimAuthorizerFn", "claim-authorizer.ts");
     const claimDetailsFn = makeFn("ClaimDetailsFn", "claim-details.ts");
-    const claimCatalogFn = makeFn("ClaimCatalogFn", "claim-catalog.ts");
-    const claimSelectFn = makeFn("ClaimSelectFn", "claim-select.ts");
+    const claimCatalogFn = makeFn("ClaimCatalogFn", "claim-catalog.ts", catalogEnv);
+    const claimSelectFn = makeFn("ClaimSelectFn", "claim-select.ts", catalogEnv);
     const claimLinkFn = makeFn("ClaimLinkFn", "claim-link.ts");
     const claimNoAccountFn = makeFn("ClaimNoAccountFn", "claim-no-account.ts");
 
+    // Async gift-card order worker — holds the ORDER key; no HTTP route.
+    const giftcardOrderWorkerFn = makeFn("GiftcardOrderWorkerFn", "giftcard-order-worker.ts", {
+      TREMENDOUS_ORDERS_SECRET_ARN: this.tremendousOrdersSecret.secretArn,
+    });
+    giftcardOrderWorkerFn.addEventSource(
+      new SqsEventSource(giftcardQueue, { batchSize: 5, reportBatchItemFailures: true }),
+    );
+
     // Admin ops (verification & fulfillment). Cognito JWT + admins-group check.
+    // adminGiftcardFn only ENQUEUES — it gets the queue URL, never the order key.
     const adminVerifyFn = makeFn("AdminVerifyFn", "admin-verify.ts");
     const adminMismatchFn = makeFn("AdminMismatchFn", "admin-mismatch.ts");
-    const adminGiftcardFn = makeFn("AdminGiftcardFn", "admin-fulfill-giftcard.ts");
+    const adminGiftcardFn = makeFn("AdminGiftcardFn", "admin-fulfill-giftcard.ts", {
+      GIFTCARD_QUEUE_URL: giftcardQueue.queueUrl,
+    });
     const adminTransferFn = makeFn("AdminTransferFn", "admin-transfer.ts");
 
     // --- least-privilege grants ---
@@ -160,8 +220,16 @@ export class ApiStack extends Stack {
     table.grantReadWriteData(adminMismatchFn);
     table.grantReadWriteData(adminGiftcardFn);
     table.grantReadWriteData(adminTransferFn);
+    table.grantReadWriteData(giftcardOrderWorkerFn);
     this.stripeSecret.grantRead(checkoutFn);
     this.stripeSecret.grantRead(webhookReceiverFn);
+    // Read-only catalog key → synchronous web/claim paths only.
+    this.tremendousCatalogSecret.grantRead(publicCatalogFn);
+    this.tremendousCatalogSecret.grantRead(claimCatalogFn);
+    this.tremendousCatalogSecret.grantRead(claimSelectFn);
+    // Order key → the async worker ONLY. adminGiftcardFn just enqueues.
+    this.tremendousOrdersSecret.grantRead(giftcardOrderWorkerFn);
+    giftcardQueue.grantSendMessages(adminGiftcardFn);
     webhookQueue.grantSendMessages(webhookReceiverFn);
     assetsBucket.grantPut(webhookProcessorFn);
     assetsBucket.grantRead(getCertificateFn);
@@ -254,6 +322,13 @@ export class ApiStack extends Stack {
     adminRoute("AdminGiftcardInt", "/admin/cards/{cardId}/fulfill-giftcard", adminGiftcardFn);
     adminRoute("AdminTransferInt", "/admin/cards/{cardId}/transfer", adminTransferFn);
 
+    // Public — storefront gift-card catalog (buyers pin allowed products).
+    this.httpApi.addRoutes({
+      path: "/catalog",
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration("PublicCatalogInt", publicCatalogFn),
+    });
+
     // Public — Stripe calls this; the signature check is the auth.
     this.httpApi.addRoutes({
       path: "/webhooks/stripe",
@@ -263,6 +338,8 @@ export class ApiStack extends Stack {
 
     new CfnOutput(this, "ApiUrl", { value: this.httpApi.apiEndpoint });
     new CfnOutput(this, "StripeSecretName", { value: this.stripeSecret.secretName });
+    new CfnOutput(this, "TremendousCatalogSecretName", { value: this.tremendousCatalogSecret.secretName });
+    new CfnOutput(this, "TremendousOrdersSecretName", { value: this.tremendousOrdersSecret.secretName });
     new CfnOutput(this, "WebhookUrl", {
       value: `${this.httpApi.apiEndpoint}/webhooks/stripe`,
     });

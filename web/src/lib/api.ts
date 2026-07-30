@@ -40,6 +40,13 @@ export interface OrderSummary {
   cards: OrderCard[];
 }
 
+export interface CatalogProduct {
+  id: string;
+  name: string;
+  popular: boolean;
+  imageUrl?: string;
+}
+
 async function authHeader(): Promise<Record<string, string>> {
   const session = await fetchAuthSession();
   const token = session.tokens?.idToken?.toString();
@@ -57,6 +64,14 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
   }
   return res.json() as Promise<T>;
+}
+
+/** Public storefront catalog (no auth) — popular pinned products by default. */
+export async function getCatalog(): Promise<CatalogProduct[]> {
+  const res = await fetch(`${config.apiUrl}/catalog`);
+  if (!res.ok) throw new Error(`Catalog unavailable (HTTP ${res.status})`);
+  const body = (await res.json()) as { products: CatalogProduct[] };
+  return body.products;
 }
 
 export const api = {

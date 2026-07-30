@@ -1,6 +1,6 @@
 import { APIGatewayProxyHandlerV2WithLambdaAuthorizer } from "aws-lambda";
 import { Repo } from "../data/repo";
-import { giftCards } from "../giftcards/stub";
+import { getGiftCardCatalog } from "../giftcards";
 import { GiftCardLeg } from "../domain/states";
 import { json } from "./http";
 
@@ -18,7 +18,7 @@ export const handler: APIGatewayProxyHandlerV2WithLambdaAuthorizer<Ctx> = async 
   if (!card) return json(404, { message: "not found" });
   if (card.giftCardLeg === GiftCardLeg.NONE) return json(200, { products: [] });
 
-  const catalog = await giftCards.listCatalog();
+  const catalog = await (await getGiftCardCatalog()).listCatalog();
   const allowed = card.allowedGiftCardProducts;
   const products = allowed.length > 0 ? catalog.filter((p) => allowed.includes(p.id)) : catalog;
   return json(200, { products, senderPinned: allowed.length > 0 });

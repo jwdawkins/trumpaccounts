@@ -1,18 +1,24 @@
 import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
 import { Repo } from "../data/repo";
-import { CardState, GiftCardLeg, TrumpLeg, legsSatisfyComplete, isTerminal } from "../domain/states";
+import { GiftCardLeg } from "../domain/states";
 import { newEventId } from "../domain/tokens";
+import { trumpLegAllowsOrdering } from "../fulfillment/order-giftcard";
 import { json } from "./http";
 import { requireAdmin } from "./admin-helpers";
 
 const repo = new Repo(requireEnv("TABLE_NAME"));
+const sqs = new SQSClient({});
+const QUEUE_URL = requireEnv("GIFTCARD_QUEUE_URL");
 const ORDER_BEFORE_VERIFY = process.env.ORDER_GIFTCARD_BEFORE_VERIFY === "true";
 
 /**
- * POST /admin/cards/{cardId}/fulfill-giftcard — place + deliver the gift card
- * (simulated Tremendous order for MVP). Gated: not ordered until the Trump leg
- * is VERIFIED (§6.3) unless ORDER_GIFTCARD_BEFORE_VERIFY. Converges to COMPLETE
- * if the Trump leg is already transferred.
+ * POST /admin/cards/{cardId}/fulfill-giftcard — ENQUEUE the gift-card order.
+ * Money never moves on this synchronous path (§6.3): this handler validates the
+ * gating, marks the leg ORDERED, and hands the job to the async order-worker
+ * (which alone holds the Tremendous order key). Returns 202. Retryable from a
+ * previous FAILED. Optional body { recipientEmail } supplies an email for
+ * SMS/SELF cards so the worker can deliver via EMAIL.
  */
 export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) => {
   const admin = requireAdmin(event.requestContext.authorizer?.jwt?.claims);
@@ -21,46 +27,58 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
   const cardId = event.pathParameters?.cardId;
   if (!cardId) return json(400, { message: "cardId required" });
 
+  let overrideEmail: string | undefined;
+  if (event.body) {
+    try {
+      overrideEmail = JSON.parse(event.body).recipientEmail || undefined;
+    } catch {
+      return json(400, { message: "invalid JSON body" });
+    }
+  }
+
   const card = await repo.getCard(cardId);
   if (!card) return json(404, { message: "not found" });
   if (card.giftCardLeg === GiftCardLeg.NONE) {
     return json(409, { message: "this gift has no gift-card portion" });
   }
-  if (card.giftCardLeg !== GiftCardLeg.SELECTED) {
+  if (card.giftCardLeg === GiftCardLeg.DELIVERED || card.tremendousOrderId) {
+    return json(409, { message: "gift card already fulfilled", tremendousOrderId: card.tremendousOrderId });
+  }
+  if (card.giftCardLeg === GiftCardLeg.ORDERED) {
+    return json(409, { message: "gift card order already in progress" });
+  }
+  // SELECTED (first attempt) or FAILED (retry) may be (re)enqueued.
+  if (card.giftCardLeg !== GiftCardLeg.SELECTED && card.giftCardLeg !== GiftCardLeg.FAILED) {
     return json(409, { message: `gift card not ready to fulfill (giftCardLeg ${card.giftCardLeg})` });
   }
-  if (!ORDER_BEFORE_VERIFY && card.trumpLeg !== TrumpLeg.VERIFIED && card.trumpLeg !== TrumpLeg.TRANSFERRED) {
+  if (!card.selectedGiftCardProduct) {
+    return json(409, { message: "no gift card product selected" });
+  }
+  if (!ORDER_BEFORE_VERIFY && !trumpLegAllowsOrdering(card.trumpLeg)) {
     return json(409, { message: "Trump leg must be VERIFIED before ordering the gift card (§6.3)" });
   }
 
   const now = new Date().toISOString();
   const actor = `admin:${admin.adminId}`;
-  const tremendousOrderId = `SIM-${cardId.slice(0, 8)}`; // simulated Tremendous order
 
-  const patch = { giftCardLeg: GiftCardLeg.DELIVERED, tremendousOrderId };
-  const completes = legsSatisfyComplete(GiftCardLeg.DELIVERED, card.trumpLeg) && !isTerminal(card.state);
+  // Mark ORDERED first so a double-click / concurrent call is rejected above.
+  await repo.saveCard({ ...card, giftCardLeg: GiftCardLeg.ORDERED, updatedAt: now });
+  await repo.appendEvent({
+    eventId: newEventId(), cardId, orderId: card.orderId, actor,
+    leg: "giftCard", reason: "gift card order enqueued", timestamp: now,
+  });
 
-  if (completes) {
-    await repo.transitionCard({
-      card, to: CardState.COMPLETE, actor, reason: "gift card delivered; both legs complete",
-      patch,
-      event: mkEvent(cardId, card.orderId, actor, card.state, CardState.COMPLETE, "giftCard", now),
-    });
-    return json(200, { giftCardLeg: GiftCardLeg.DELIVERED, state: CardState.COMPLETE });
-  }
+  await sqs.send(
+    new SendMessageCommand({
+      QueueUrl: QUEUE_URL,
+      MessageBody: JSON.stringify({ cardId, overrideEmail }),
+      MessageGroupId: cardId, // per-card ordering
+      MessageDeduplicationId: `${cardId}:${now}`, // distinct per (re)enqueue so retries aren't dropped
+    }),
+  );
 
-  await repo.saveCard({ ...card, ...patch, updatedAt: now });
-  await repo.appendEvent(mkEvent(cardId, card.orderId, actor, undefined, undefined, "giftCard", now, "gift card ordered + delivered (simulated)"));
-  return json(200, { giftCardLeg: GiftCardLeg.DELIVERED, state: card.state });
+  return json(202, { giftCardLeg: GiftCardLeg.ORDERED, state: card.state, message: "order enqueued" });
 };
-
-function mkEvent(
-  cardId: string, orderId: string, actor: string,
-  from: CardState | undefined, to: CardState | undefined,
-  leg: "giftCard" | "trump", timestamp: string, reason = "",
-) {
-  return { eventId: newEventId(), cardId, orderId, actor, from, to, leg, reason, timestamp };
-}
 
 function requireEnv(name: string): string {
   const v = process.env[name];
