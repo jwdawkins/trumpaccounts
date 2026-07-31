@@ -5,6 +5,7 @@ recipient's **Trump Account** (federal tax-advantaged child savings account) and
 an optional retail gift card fulfilled via **Tremendous**.
 
 Full design & decisions: [`dev handoff.md`](./dev%20handoff.md).
+New machine / getting started: [`SETUP.md`](./SETUP.md).
 
 ## Stack
 
