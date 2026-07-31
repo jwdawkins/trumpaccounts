@@ -9,7 +9,9 @@ Full design & decisions: [`dev handoff.md`](./dev%20handoff.md).
 ## Stack
 
 - **Infra:** AWS CDK (TypeScript) — one stack per concern (`infra/`)
-- **Compute:** AWS Lambda (Node 20, TS), API Gateway HTTP API
+- **Compute:** AWS Lambda (Node 22, TS), API Gateway HTTP API. The async
+  Trump-Account funding worker is a **container-image Lambda** running Playwright
+  Chromium (see [`funding/`](./funding) + `services/Dockerfile.funding`).
 - **Data:** DynamoDB single-table (`gift-platform`) + immutable audit log to S3 Object Lock
 - **Auth:** Amazon Cognito (buyers/admins groups)
 - **Frontend:** React + Vite + Tailwind SPA (`web/`)
@@ -24,7 +26,9 @@ Full design & decisions: [`dev handoff.md`](./dev%20handoff.md).
 ## Layout
 
 ```
-infra/    CDK app — DataStack, AuthStack, (AsyncStack, ApiStack, WebStack to come)
+infra/    CDK app — DataStack, AuditStack, AuthStack, ApiStack (WebStack to come)
+services/ Lambda handlers + domain/data/funding logic (TS)
+funding/  standalone local Playwright proving harness (prod runs in services/)
 web/      React SPA — buyer (/), recipient (/claim/:token), admin (/admin)
 ```
 
@@ -39,9 +43,15 @@ npm run synth               # cdk synth (infra)
 
 ## Build order (see handoff §10)
 
-- **M1** Foundation — stacks, data table, audit pipeline, Cognito, SPA skeleton, CI ← *in progress*
-- **M2** Buyer & payments
-- **M3** Recipient claim
-- **M4** Verification & fulfillment
-- **M5** Admin portal
+- **M1** Foundation — stacks, data table, audit pipeline, Cognito, SPA skeleton, CI ✅
+- **M2** Buyer & payments ✅
+- **M3** Recipient claim ✅
+- **M4** Verification & fulfillment ✅
+- **M5** Admin portal ← *next*
 - **M6** Hardening
+
+Beyond the milestones: async Trump-Account funding pipeline (auto verify →
+contribute → transfer, with retries/sweeper) is live, with the real Playwright
+funding worker deployed on a container-image Lambda; gift-card ordering
+(Tremendous) is async + auto-fulfilled. Remaining on funding: real debit-card
+submit + captcha handling (human-in-the-loop).

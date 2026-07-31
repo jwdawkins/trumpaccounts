@@ -1,0 +1,65 @@
+# Container-image Lambda for the async Trump-Account funding worker.
+#
+# The worker drives the Robinhood contribution page with real Playwright
+# Chromium (services/src/funding/playwright-provider.ts), so it needs a browser
+# and all its shared libraries — which the zip API Lambdas can't provide. We base
+# the final image on the official Playwright image (Chromium + OS deps already
+# installed at /ms-playwright) and add the Lambda Runtime Interface Client so it
+# speaks the Lambda invoke protocol. See [[trump-funding-flow]].
+#
+# IMPORTANT: the Playwright base tag MUST match the playwright-core version
+# (1.62.1) so the Chromium build under /ms-playwright is the revision
+# playwright-core expects.
+
+# ---- Stage 1: bundle the handler ----
+FROM node:22-bookworm-slim AS builder
+WORKDIR /build
+
+# Install the services package deps so esbuild can resolve @aws-sdk/*, the repo,
+# domain, fulfillment, etc. playwright-core has no browser-download postinstall,
+# so this stays fast.
+COPY package.json ./
+# --legacy-peer-deps: a clean install (no monorepo lockfile) trips over transient
+# @aws-sdk/client-dynamodb vs lib-dynamodb peer skew; the exact minor is irrelevant
+# because esbuild bundles @aws-sdk into the handler anyway.
+RUN npm install --no-audit --no-fund --legacy-peer-deps
+
+# Bundle trump-funding-worker into a single CJS file. Everything is inlined
+# EXCEPT playwright-core, which is left as a runtime require resolved against the
+# node_modules installed in the final stage (keeps the browser/native bits out of
+# the bundle). @aws-sdk is bundled in because the Ubuntu base image doesn't ship it.
+COPY src ./src
+RUN npx --yes esbuild@0.24.2 src/handlers/trump-funding-worker.ts \
+      --bundle \
+      --platform=node \
+      --target=node22 \
+      --format=cjs \
+      --external:playwright-core \
+      --outfile=/build/dist/index.js
+
+# ---- Stage 2: runtime (Playwright Chromium + Lambda RIC) ----
+FROM mcr.microsoft.com/playwright:v1.62.1-jammy
+
+ENV LAMBDA_TASK_ROOT=/var/task
+# Chromium lives here in the base image; point playwright-core at it.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+# Select the real browser-driven funding provider (funding/index.ts).
+ENV TRUMP_FUNDING_PROVIDER=playwright
+WORKDIR ${LAMBDA_TASK_ROOT}
+
+# Build toolchain for the aws-lambda-ric native addon.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      g++ make cmake unzip libcurl4-openssl-dev autoconf automake libtool ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Runtime deps: the Lambda RIC + playwright-core (exact, matches base image).
+COPY docker-funding-runtime.json ${LAMBDA_TASK_ROOT}/package.json
+RUN npm install --no-audit --no-fund
+
+# The bundled handler.
+COPY --from=builder /build/dist/index.js ${LAMBDA_TASK_ROOT}/index.js
+
+# The Lambda Runtime Interface Client is the container entrypoint; CMD is the
+# handler. (Local testing can front this with the Runtime Interface Emulator.)
+ENTRYPOINT ["/usr/bin/npx", "aws-lambda-ric"]
+CMD ["index.handler"]

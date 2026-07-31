@@ -1,0 +1,10 @@
+{
+  "name": "trump-funding-worker-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runtime deps for the container-image Trump-funding Lambda. playwright-core is pinned EXACTLY to the Playwright base-image version so the bundled Chromium under /ms-playwright matches the revision playwright-core expects.",
+  "dependencies": {
+    "aws-lambda-ric": "^3.2.0",
+    "playwright-core": "1.62.1"
+  }
+}

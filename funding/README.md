@@ -7,8 +7,13 @@ U.S. Treasury**) exactly like a person would. This is the real implementation of
 the Robinhood contribution page, **on behalf of the gifter** (the buyer already
 paid the full gift via Stripe).
 
-It runs **outside** the API Lambdas (needs Chromium) — e.g., a local process,
-a container, or Fargate — triggered asynchronously when a card needs funding.
+It runs **outside** the zip API Lambdas (needs Chromium). **This `funding/` dir
+is the standalone local proving harness** (`src/run.mjs`, drive a link headed to
+eyeball the flow). **Production runs the same real provider** —
+[`services/src/funding/playwright-provider.ts`](../services/src/funding/playwright-provider.ts)
+— **on a container-image Lambda** (SQS-triggered async funding worker); see
+[`services/Dockerfile.funding`](../services/Dockerfile.funding) and the
+`trump-build-status` memory for the image + deployment details.
 
 ## Verified flow (2026-07-30)
 
@@ -39,9 +44,13 @@ review step.
 
 ## Open decisions / notes
 
-- **Runtime:** not the API Lambda (Chromium too heavy). Pick a container/Fargate
-  or a small always-on worker that polls for cards with `trumpLeg = VERIFIED`
-  awaiting transfer, funds them, and records the confirmation.
+- **Runtime:** RESOLVED (2026-07-31) — a **container-image Lambda** (Playwright
+  base `v1.62.1-jammy` + `aws-lambda-ric`, x86_64, 2048 MB, 1024 MB `/tmp`),
+  SQS-triggered off the `trump-funding` FIFO queue. Deployed + verified launching
+  Chromium in-Lambda. Chromium needs the hardened launch flags
+  `--no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu --single-process --no-zygote`
+  (without `--single-process/--no-zygote` a renderer crashes → CDP "Assertion
+  error"). Debit-card SUBMIT still stops at the debit-card page (below).
 - **Debit card handling:** the real card is supplied **at runtime only** (secure
   prompt / Secrets Manager) and passed to `contribute({ card })`. Never commit,
   log, or hard-code it. `fillDebitCard` is scaffolded but **UNTESTED** pending a

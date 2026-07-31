@@ -1,4 +1,4 @@
-import { Stack, StackProps, Duration, CfnOutput, SecretValue } from "aws-cdk-lib";
+import { Stack, StackProps, Duration, CfnOutput, SecretValue, Size } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import * as path from "path";
 import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
@@ -8,7 +8,7 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import { RemovalPolicy } from "aws-cdk-lib";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
+import { Runtime, DockerImageFunction, DockerImageCode, Architecture } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { HttpApi, HttpMethod, CorsHttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
@@ -133,7 +133,9 @@ export class ApiStack extends Stack {
       queueName: `${APP_NAME}-${cfg.stage}-trump-funding.fifo`,
       fifo: true,
       contentBasedDeduplication: false,
-      visibilityTimeout: Duration.seconds(60), // spacing between quick retries
+      // Must be >= the worker's function timeout (120s). Also the spacing between
+      // quick SQS redeliveries — a failed message reappears after this long.
+      visibilityTimeout: Duration.seconds(150),
       deadLetterQueue: { queue: fundingDlq, maxReceiveCount: 3 },
     });
 
@@ -221,9 +223,29 @@ export class ApiStack extends Stack {
     );
 
     // Async Trump-funding worker (SQS-triggered) — auto-verify + contribute.
-    // batchSize 1 so ApproximateReceiveCount tracks per-card quick retries cleanly.
-    const trumpFundingWorkerFn = makeFn("TrumpFundingWorkerFn", "trump-funding-worker.ts", {
-      GIFTCARD_QUEUE_URL: giftcardQueue.queueUrl,
+    // Container-image Lambda: the real provider drives the Robinhood contribution
+    // page with Playwright Chromium, which the zip runtime can't provide. The
+    // image bases on the Playwright image (Chromium + OS deps) + the Lambda RIC;
+    // see services/Dockerfile.funding and [[trump-funding-flow]]. Chromium launch
+    // needs headroom, so memory 2048 / timeout 120s (the funding queue's
+    // visibility timeout is raised to match). batchSize 1 so
+    // ApproximateReceiveCount tracks per-card quick retries cleanly.
+    const servicesDir = path.join(__dirname, "..", "..", "services");
+    const trumpFundingWorkerFn = new DockerImageFunction(this, "TrumpFundingWorkerFn", {
+      code: DockerImageCode.fromImageAsset(servicesDir, {
+        file: "Dockerfile.funding",
+      }),
+      architecture: Architecture.X86_64,
+      memorySize: 2048,
+      // Chromium spills shared memory to /tmp under --disable-dev-shm-usage and
+      // writes a user-data-dir there; the 512 MB default is too tight.
+      ephemeralStorageSize: Size.mebibytes(1024),
+      timeout: Duration.seconds(120),
+      environment: {
+        TABLE_NAME: table.tableName,
+        GIFTCARD_QUEUE_URL: giftcardQueue.queueUrl,
+        TRUMP_FUNDING_PROVIDER: "playwright",
+      },
     });
     trumpFundingWorkerFn.addEventSource(
       new SqsEventSource(fundingQueue, { batchSize: 1, reportBatchItemFailures: true }),

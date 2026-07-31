@@ -62,7 +62,19 @@ export class PlaywrightTrumpFundingProvider implements TrumpAccountFundingProvid
       browser = await chromium.launch({
         headless: this.headless,
         executablePath: process.env.CHROMIUM_PATH || undefined,
-        args: ["--no-sandbox", "--disable-dev-shm-usage"],
+        // Lambda-proven flag set. --no-sandbox/--disable-setuid-sandbox (no user
+        // namespaces), --disable-dev-shm-usage (tiny /dev/shm → spill to /tmp),
+        // and --single-process/--no-zygote/--disable-gpu keep Chromium from
+        // spawning zygote/renderer helpers the Lambda sandbox can't manage —
+        // without these a renderer crashes and CDP throws an "Assertion error".
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--single-process",
+          "--no-zygote",
+        ],
       });
       const page = await browser.newPage({ viewport: { width: 420, height: 900 } });
       return await fn(page);
