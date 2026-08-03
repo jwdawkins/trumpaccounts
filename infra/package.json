@@ -7,6 +7,7 @@
     "test": "vitest run",
     "synth": "cdk synth",
     "deploy": "cdk deploy --all",
+    "deploy:marketing": "MARKETING_DOMAINS=\"trumpaccountgiftcards.com,www.trumpaccountgiftcards.com\" MARKETING_CERT_ARN=\"arn:aws:acm:us-east-1:353138588369:certificate/95446aba-dee2-4c64-9673-6d7cf16c563f\" cdk deploy gift-platform-dev-marketing --profile trump-dev --require-approval never",
     "bootstrap": "cdk bootstrap"
   },
   "devDependencies": {

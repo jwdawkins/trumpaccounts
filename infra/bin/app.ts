@@ -5,6 +5,7 @@ import { DataStack } from "../lib/data-stack";
 import { AuditStack } from "../lib/audit-stack";
 import { AuthStack } from "../lib/auth-stack";
 import { ApiStack } from "../lib/api-stack";
+import { MarketingStack } from "../lib/marketing-stack";
 
 const app = new App();
 const cfg = resolveEnv();
@@ -28,6 +29,20 @@ new ApiStack(app, stackName(cfg, "api"), {
   userPoolClient: auth.userPoolClient,
   corsOrigins: ["http://localhost:5173"],
   webBaseUrl: "http://localhost:5173",
+});
+
+// Public marketing site: static S3 + CloudFront. Custom domain is opt-in via
+// env — MARKETING_DOMAINS (comma-separated) + MARKETING_CERT_ARN (us-east-1);
+// absent → served on the *.cloudfront.net domain.
+const marketingDomains = process.env.MARKETING_DOMAINS
+  ?.split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+new MarketingStack(app, stackName(cfg, "marketing"), {
+  cfg,
+  env,
+  domainNames: marketingDomains,
+  certificateArn: process.env.MARKETING_CERT_ARN,
 });
 
 // Consistent tags across every resource for cost allocation & ownership.
