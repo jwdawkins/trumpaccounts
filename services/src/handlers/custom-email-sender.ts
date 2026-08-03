@@ -60,14 +60,29 @@ function subjectFor(triggerSource: string): string {
 }
 
 function bodyHtml(code: string): string {
+  // Mirrors the gift-card header lockup: a gold-bordered "T" box next to
+  // "TRUMP ACCOUNT" with "GIFT CARD" beneath it, on the dark navy card base.
   return `
-    <div style="font-family:Georgia,'Times New Roman',serif;max-width:460px;margin:auto;background:#060D18;color:#fff;padding:32px;border-radius:12px">
-      <div style="display:inline-block;border:2px solid #C79E4D;border-radius:8px;width:44px;height:44px;line-height:44px;text-align:center;color:#C79E4D;font-weight:700;font-size:22px">T</div>
-      <h2 style="color:#C79E4D;margin:20px 0 4px">Your sign-in code</h2>
-      <p style="color:#c9d3e0;font-size:14px;margin:0 0 20px">Enter this code to finish checking out with Trump Account Gift Cards.</p>
-      <div style="font-size:34px;font-weight:700;letter-spacing:8px;color:#fff;background:#0A1B33;border:1px solid rgba(199,158,77,.4);border-radius:8px;padding:16px;text-align:center">${code}</div>
-      <p style="color:#8994a6;font-size:12px;margin-top:20px">This code expires shortly. If you didn't request it, you can ignore this email.</p>
-    </div>`;
+  <div style="background:#02060d;padding:24px 12px">
+    <div style="font-family:Georgia,'Times New Roman',serif;max-width:460px;margin:0 auto;background:#060D18;color:#ffffff;padding:32px;border-radius:12px;border:1px solid rgba(199,158,77,.25)">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px">
+        <tr>
+          <td style="vertical-align:middle;padding-right:12px">
+            <div style="width:44px;height:44px;border:2px solid #C79E4D;text-align:center;line-height:42px;color:#C79E4D;font-family:Georgia,serif;font-weight:700;font-size:24px">T</div>
+          </td>
+          <td style="vertical-align:middle">
+            <div style="font-family:Georgia,serif;font-weight:700;font-size:16px;letter-spacing:2px;color:#ffffff;text-transform:uppercase;line-height:1.15">Trump Account</div>
+            <div style="font-family:Georgia,serif;font-weight:600;font-size:11px;letter-spacing:3px;color:#C79E4D;text-transform:uppercase;margin-top:3px">Gift Card</div>
+          </td>
+        </tr>
+      </table>
+
+      <h2 style="color:#C79E4D;margin:0 0 4px;font-size:20px;font-family:Georgia,serif">Your sign-in code</h2>
+      <p style="color:#c9d3e0;font-size:14px;margin:0 0 20px;font-family:system-ui,Arial,sans-serif">Enter this code to finish checking out.</p>
+      <div style="font-size:34px;font-weight:700;letter-spacing:8px;color:#ffffff;background:#0A1B33;border:1px solid rgba(199,158,77,.4);border-radius:8px;padding:16px;text-align:center;font-family:system-ui,Arial,sans-serif">${code}</div>
+      <p style="color:#8994a6;font-size:12px;margin-top:20px;font-family:system-ui,Arial,sans-serif">This code expires shortly. If you didn&rsquo;t request it, you can ignore this email.</p>
+    </div>
+  </div>`;
 }
 
 export async function handler(event: CustomEmailSenderEvent): Promise<void> {
