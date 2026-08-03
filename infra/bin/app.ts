@@ -58,7 +58,10 @@ new ApiStack(app, stackName(cfg, "api"), {
   userPool: auth.userPool,
   userPoolClient: auth.userPoolClient,
   corsOrigins,
-  webBaseUrl: "http://localhost:5173",
+  // Base URL Stripe returns buyers to after checkout (success/cancel). The
+  // storefront now lives on the marketing site, so default to its prod origin;
+  // override with WEB_BASE_URL for local end-to-end testing.
+  webBaseUrl: process.env.WEB_BASE_URL ?? marketingProdOrigins[0],
 });
 new MarketingStack(app, stackName(cfg, "marketing"), {
   cfg,

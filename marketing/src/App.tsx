@@ -3,6 +3,7 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { CheckoutReturn } from "@/components/CheckoutReturn";
 import Home from "@/pages/Home";
 import Shop from "@/pages/Shop";
 import NotFound from "@/pages/not-found";
@@ -57,6 +58,7 @@ function App() {
           <ScrollToHash />
           <Router />
         </WouterRouter>
+        <CheckoutReturn />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

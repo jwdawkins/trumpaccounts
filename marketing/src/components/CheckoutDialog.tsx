@@ -8,7 +8,7 @@ type Step = "email" | "code" | "acknowledge" | "paying" | "error";
 
 export function CheckoutDialog({ onClose }: { onClose: () => void }) {
   const { email: signedInEmail, begin, confirm } = useAuth();
-  const { lines, clear } = useCart();
+  const { lines } = useCart();
 
   const [step, setStep] = useState<Step>(signedInEmail ? "acknowledge" : "email");
   const [email, setEmail] = useState(signedInEmail ?? "");
@@ -42,7 +42,9 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
         const order = await api.createOrder(items, true, fromName.trim() || undefined);
         const { url } = await api.checkout(order.orderId);
         if (!cancelled) {
-          clear();
+          // Keep the cart until payment actually succeeds — the CheckoutReturn
+          // handler clears it on the `?checkout=success` redirect, so a cancel
+          // at Stripe leaves the cart intact.
           window.location.href = url;
         }
       } catch (e) {
