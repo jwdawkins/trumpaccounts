@@ -42,7 +42,7 @@ export function validateCartItem(item: CartItemInput): void {
   }
   if (!isTrumpPercent(item.trumpPercent)) {
     throw new CartValidationError(
-      `trumpPercent must be one of 10, 25, 50, 100 (got ${item.trumpPercent})`,
+      `trumpPercent must be a whole number between 1 and 100 (got ${item.trumpPercent})`,
     );
   }
   if (item.message && item.message.length > MAX_MESSAGE) {

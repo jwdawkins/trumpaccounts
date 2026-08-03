@@ -35,8 +35,13 @@ describe("validateCartItem (D2/D3)", () => {
       validateCartItem({ totalAmount: 5000, trumpPercent: 50, deliveryMethod: "SELF", verificationMode: "OPEN" }),
     ).not.toThrow();
   });
-  it("rejects bad percentages and sub-dollar amounts", () => {
-    expect(() => validateCartItem({ ...base, trumpPercent: 30 })).toThrow();
+  it("accepts a custom whole percent", () => {
+    expect(() => validateCartItem({ ...base, trumpPercent: 37 })).not.toThrow();
+  });
+  it("rejects out-of-range / non-integer percentages and sub-dollar amounts", () => {
+    expect(() => validateCartItem({ ...base, trumpPercent: 0 })).toThrow();
+    expect(() => validateCartItem({ ...base, trumpPercent: 101 })).toThrow();
+    expect(() => validateCartItem({ ...base, trumpPercent: 33.5 })).toThrow();
     expect(() => validateCartItem({ ...base, totalAmount: 50 })).toThrow();
   });
 });

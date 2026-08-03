@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "../lib/auth";
-import { useCart } from "../lib/cart";
-import { api } from "../lib/api";
-import { formatCents } from "../lib/format";
+import { useAuth } from "@/lib/auth";
+import { useCart } from "@/lib/cart";
+import { api, type CartItemInput } from "@/lib/api";
+import { formatCents } from "@/lib/format";
 
 type Step = "email" | "code" | "acknowledge" | "paying" | "error";
 
 export function CheckoutDialog({ onClose }: { onClose: () => void }) {
   const { email: signedInEmail, begin, confirm } = useAuth();
-  const { lines } = useCart();
+  const { lines, clear } = useCart();
+
   const [step, setStep] = useState<Step>(signedInEmail ? "acknowledge" : "email");
   const [email, setEmail] = useState(signedInEmail ?? "");
   const [code, setCode] = useState("");
@@ -20,15 +21,30 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
   // Total Trump-contribution portion across the cart (integer cents).
   const trumpTotal = lines.reduce((sum, l) => sum + Math.round((l.totalAmount * l.trumpPercent) / 100), 0);
 
-  // Once acknowledged, create the order and redirect to Stripe.
+  // Once acknowledged, create the order (from the cart lines, which already carry
+  // recipient details from the builder) and redirect to Stripe.
   useEffect(() => {
     if (step !== "paying") return;
     let cancelled = false;
     (async () => {
       try {
-        const order = await api.createOrder(lines, true, fromName.trim() || undefined);
+        const items: CartItemInput[] = lines.map((l) => ({
+          totalAmount: l.totalAmount,
+          trumpPercent: l.trumpPercent,
+          allowedGiftCardProducts: l.allowedGiftCardProducts,
+          verificationMode: l.verificationMode ?? "OPEN",
+          recipientName: l.recipientName,
+          message: l.message,
+          deliveryMethod: l.deliveryMethod ?? "SELF",
+          recipientEmail: l.recipientEmail,
+          recipientPhone: l.recipientPhone,
+        }));
+        const order = await api.createOrder(items, true, fromName.trim() || undefined);
         const { url } = await api.checkout(order.orderId);
-        if (!cancelled) window.location.href = url;
+        if (!cancelled) {
+          clear();
+          window.location.href = url;
+        }
       } catch (e) {
         if (!cancelled) {
           setError((e as Error).message);
@@ -39,7 +55,7 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [step, lines]);
+  }, [step]);
 
   async function submitEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -70,23 +86,23 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
   }
 
   const input =
-    "mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+    "mt-1 w-full border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-accent focus:outline-none";
   const primary =
-    "w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50";
+    "w-full bg-accent text-accent-foreground font-serif font-semibold px-4 py-2.5 transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-card p-6 shadow-2xl border border-border">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Checkout</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700" aria-label="Close">
+          <h2 className="text-xl font-serif font-bold text-primary">Checkout</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground" aria-label="Close">
             ✕
           </button>
         </div>
 
         {step === "email" && (
           <form onSubmit={submitEmail} className="space-y-3">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               Enter your email — we&rsquo;ll send a one-time code to sign in or create your account.
             </p>
             <input
@@ -106,7 +122,7 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
 
         {step === "code" && (
           <form onSubmit={submitCode} className="space-y-3">
-            <p className="text-sm text-slate-600">Enter the code we emailed to {email}.</p>
+            <p className="text-sm text-muted-foreground">Enter the code we emailed to {email}.</p>
             <input
               className={input}
               inputMode="numeric"
@@ -125,22 +141,22 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
         {step === "acknowledge" && (
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-slate-700">Your name (optional)</label>
+              <label className="text-sm font-medium text-foreground">Your name (optional)</label>
               <input
                 className={input}
                 placeholder="Shown to the recipient as “from …”"
                 value={fromName}
                 onChange={(e) => setFromName(e.target.value)}
               />
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Leave blank and we&rsquo;ll use your account name or email.
               </p>
             </div>
-            <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+            <div className="bg-muted p-3 text-sm text-muted-foreground">
               Trump Account contribution:{" "}
-              <span className="font-semibold text-slate-900">{formatCents(trumpTotal)}</span>
+              <span className="font-semibold text-foreground">{formatCents(trumpTotal)}</span>
             </div>
-            <label className="flex items-start gap-2 text-sm text-slate-700">
+            <label className="flex items-start gap-2 text-sm text-foreground">
               <input
                 type="checkbox"
                 className="mt-0.5"
@@ -159,19 +175,19 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
         )}
 
         {step === "paying" && (
-          <p className="py-6 text-center text-sm text-slate-600">Redirecting you to secure payment…</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">Redirecting you to secure payment…</p>
         )}
 
         {step === "error" && (
           <div className="space-y-3">
-            <p className="text-sm text-red-600">{error}</p>
+            <p className="text-sm text-destructive">{error}</p>
             <button className={primary} onClick={onClose}>
               Close
             </button>
           </div>
         )}
 
-        {error && step !== "error" && <p className="mt-3 text-sm text-red-600">{error}</p>}
+        {error && step !== "error" && <p className="mt-3 text-sm text-destructive">{error}</p>}
       </div>
     </div>
   );

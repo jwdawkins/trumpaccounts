@@ -22,16 +22,42 @@ etc.).
 
 ## Pages
 
-`/` (Home, incl. the interactive gift configurator), `/shop` (**Coming Soon**
-placeholder — purchasing isn't live pre-launch), `/how-it-works`,
+`/` (Home, incl. the interactive gift configurator), `/shop` (the live gift
+storefront — configurator + cart + checkout), `/how-it-works`,
 `/about-trump-accounts`, `/faq`, `/contact`. Launch is **July 2026** (waitlist).
+
+## Storefront (gift purchasing)
+
+The gift-card storefront now lives here (it replaced the old form in
+[`../web`](../web)). The configurator builds a gift, adds it to a cart, and the
+checkout dialog signs the buyer in via Cognito email OTP, collects per-gift
+recipient/delivery details, and calls the platform API (`POST /orders` +
+`POST /checkout` → Stripe). The transactional code is ported from `web/`:
+`src/lib/{api,auth,cart,amplify,format}.ts` and
+`src/components/{CartPanel,CheckoutDialog}.tsx`.
+
+### Required env (public SPA config, not secrets)
+
+The site calls the API + Cognito directly, so it needs the same four `VITE_*`
+vars as `web/`. Copy `.env.example` → `.env` and fill them:
+
+```
+VITE_API_URL, VITE_AWS_REGION, VITE_USER_POOL_ID, VITE_USER_POOL_CLIENT_ID
+```
+
+⚠️ These are **baked into `dist/` at `npm run build` time**, not read at CDK
+deploy time — they must be present in the environment when you build, *before*
+`deploy:marketing`. The API must also allow this site's origin: the marketing
+domains (and `http://localhost:5174` for dev) are in the API's `corsOrigins`
+([`../infra/bin/app.ts`](../infra/bin/app.ts)) — changing them requires
+redeploying the `api` stack.
 
 ## Forms are stubbed
 
-`src/lib/api-client.ts` is a local stand-in for the Replit API client. The
-waitlist + contact forms show a success toast and `console.info` the payload —
-**there is no backend**. To wire a real one, replace the body of `simulateSubmit`
-with a `fetch(...)`; the form components don't need to change.
+The **waitlist + contact** forms are still stubbed: `src/lib/api-client.ts` is a
+local stand-in that shows a success toast and `console.info`s the payload — no
+backend. (The gift storefront above is *not* stubbed.) To wire these up, replace
+the body of `simulateSubmit` with a `fetch(...)`; the form components don't change.
 
 ## Develop
 

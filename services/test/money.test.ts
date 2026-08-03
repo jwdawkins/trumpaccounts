@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { splitCents, dollarsToCents, formatCents, isTrumpPercent, processingFeeCents } from "../src/domain/money";
 
 describe("splitCents", () => {
-  it("splits so the parts always sum back to the total", () => {
+  it("splits so the parts always sum back to the total (incl. custom percents)", () => {
     for (const total of [100, 999, 12345, 5000, 1]) {
-      for (const pct of [10, 25, 50, 100] as const) {
+      for (const pct of [1, 10, 25, 37, 50, 63, 99, 100]) {
         const { trumpCents, giftCardCents } = splitCents(total, pct);
         expect(trumpCents + giftCardCents).toBe(total);
         expect(Number.isInteger(trumpCents)).toBe(true);
@@ -37,9 +37,15 @@ describe("helpers", () => {
     expect(formatCents(1999)).toBe("$19.99");
     expect(formatCents(0)).toBe("$0.00");
   });
-  it("isTrumpPercent guards the allowed set", () => {
+  it("isTrumpPercent accepts any whole percent 1–100", () => {
     expect(isTrumpPercent(25)).toBe(true);
-    expect(isTrumpPercent(30)).toBe(false);
+    expect(isTrumpPercent(30)).toBe(true);
+    expect(isTrumpPercent(1)).toBe(true);
+    expect(isTrumpPercent(100)).toBe(true);
+    expect(isTrumpPercent(0)).toBe(false);
+    expect(isTrumpPercent(101)).toBe(false);
+    expect(isTrumpPercent(-5)).toBe(false);
+    expect(isTrumpPercent(33.5)).toBe(false);
   });
 });
 

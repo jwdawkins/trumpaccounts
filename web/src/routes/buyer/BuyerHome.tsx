@@ -1,61 +1,36 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { GiftForm } from "../../components/GiftForm";
-import { CartPanel } from "../../components/CartPanel";
-import { CheckoutDialog } from "../../components/CheckoutDialog";
-import { useCart } from "../../lib/cart";
+// Buyer purchasing now lives on the marketing storefront
+// (trumpaccountgiftcards.com). This app keeps the authenticated buyer history,
+// recipient claim, and admin flows; the gift-building storefront was retired.
+const STOREFRONT_URL = "https://trumpaccountgiftcards.com/shop";
 
-// Buyer storefront (handoff §7.1) — browse & build a cart with no login;
-// an account is created/entered only at checkout (D1).
 export function BuyerHome() {
-  const { add, clear } = useCart();
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [params, setParams] = useSearchParams();
-  const checkout = params.get("checkout");
-
-  // Returning from Stripe: success clears the cart.
-  useEffect(() => {
-    if (checkout === "success") clear();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkout]);
-
   return (
     <div className="space-y-6">
       <section>
         <h1 className="text-2xl font-semibold">Give a gift that grows</h1>
         <p className="mt-1 max-w-prose text-slate-600">
-          Split a gift between a contribution to a child&rsquo;s Trump Account and an optional
-          retail gift card.
+          Building and buying gift cards now happens on our storefront.
         </p>
       </section>
 
-      {checkout === "success" && (
-        <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-          Payment received — your gift links are on their way. See{" "}
+      <div className="rounded-lg border border-slate-200 bg-white p-6">
+        <p className="text-slate-700">
+          Head to the storefront to build a gift and check out.
+        </p>
+        <a
+          href={STOREFRONT_URL}
+          className="mt-4 inline-block rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          Go to the storefront
+        </a>
+        <p className="mt-4 text-sm text-slate-500">
+          Already bought gifts?{" "}
           <a href="/history" className="font-medium underline">
-            your history
+            View your history
           </a>
           .
-          <button className="ml-3 text-green-700 underline" onClick={() => setParams({})}>
-            dismiss
-          </button>
-        </div>
-      )}
-      {checkout === "cancel" && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Checkout canceled — your cart is still here.
-          <button className="ml-3 underline" onClick={() => setParams({})}>
-            dismiss
-          </button>
-        </div>
-      )}
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <GiftForm onAdd={add} />
-        <CartPanel onCheckout={() => setCheckingOut(true)} />
+        </p>
       </div>
-
-      {checkingOut && <CheckoutDialog onClose={() => setCheckingOut(false)} />}
     </div>
   );
 }

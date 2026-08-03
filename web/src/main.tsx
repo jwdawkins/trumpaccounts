@@ -4,7 +4,6 @@ import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
 import { configureAmplify } from "./lib/amplify";
 import { AuthProvider } from "./lib/auth";
-import { CartProvider } from "./lib/cart";
 import "./index.css";
 
 configureAmplify();
@@ -12,9 +11,7 @@ configureAmplify();
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <AuthProvider>
-      <CartProvider>
-        <RouterProvider router={router} />
-      </CartProvider>
+      <RouterProvider router={router} />
     </AuthProvider>
   </React.StrictMode>,
 );

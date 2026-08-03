@@ -25,7 +25,7 @@ const BASE_URL: Record<TremendousEnvironment, string> = {
  * case-insensitively against the Tremendous product name — Tremendous product
  * ids are opaque, so we key on the human name.
  */
-const POPULAR_BRANDS = ["amazon", "starbucks", "visa", "target", "walmart", "doordash"];
+const POPULAR_BRANDS = ["visa", "amazon", "starbucks", "walmart"];
 
 const CATALOG_TTL_MS = 24 * 60 * 60 * 1000; // 24h (§6.3)
 

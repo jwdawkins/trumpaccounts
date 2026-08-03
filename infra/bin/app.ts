@@ -21,16 +21,6 @@ new AuditStack(app, stackName(cfg, "audit"), {
 
 const auth = new AuthStack(app, stackName(cfg, "auth"), { cfg, env });
 
-new ApiStack(app, stackName(cfg, "api"), {
-  cfg,
-  env,
-  table: data.table,
-  userPool: auth.userPool,
-  userPoolClient: auth.userPoolClient,
-  corsOrigins: ["http://localhost:5173"],
-  webBaseUrl: "http://localhost:5173",
-});
-
 // Public marketing site: static S3 + CloudFront. Custom domain is opt-in via
 // env — MARKETING_DOMAINS (comma-separated) + MARKETING_CERT_ARN (us-east-1);
 // absent → served on the *.cloudfront.net domain.
@@ -38,6 +28,38 @@ const marketingDomains = process.env.MARKETING_DOMAINS
   ?.split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+
+// The marketing site now calls the API directly (catalog + authed orders/checkout),
+// so its origins must be allowed by CORS. Dev servers: web/ on 5173, marketing/ on
+// 5174. Prod: the marketing custom domains (https), defaulting to the known ones.
+const marketingProdOrigins = (marketingDomains ?? [
+  "trumpaccountgiftcards.com",
+  "www.trumpaccountgiftcards.com",
+]).map((d) => `https://${d}`);
+// The `liono` shared dev server also hosts the marketing dev build (port 5174),
+// reached over LAN / Tailscale — allow those origins so full-stack testing works
+// without an SSH tunnel. Dev-stage convenience only.
+const lionoDevOrigins = [
+  "http://liono:5174",
+  "http://10.7.14.120:5174", // LAN
+  "http://100.73.224.46:5174", // Tailscale
+];
+const corsOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  ...lionoDevOrigins,
+  ...marketingProdOrigins,
+];
+
+new ApiStack(app, stackName(cfg, "api"), {
+  cfg,
+  env,
+  table: data.table,
+  userPool: auth.userPool,
+  userPoolClient: auth.userPoolClient,
+  corsOrigins,
+  webBaseUrl: "http://localhost:5173",
+});
 new MarketingStack(app, stackName(cfg, "marketing"), {
   cfg,
   env,

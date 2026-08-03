@@ -8,15 +8,15 @@ import {
 const faqs = [
   {
     question: "What is a Trump Account Gift Card?",
-    answer: "A prepaid Visa gift card where you choose what percentage goes to spending and what percentage goes into a child's Trump Account (Section 530A IRA)."
+    answer: "A gift card where you choose what percentage goes to spending and what percentage goes into a child's Trump Account (Section 530A IRA)."
   },
   {
     question: "How does the split work?",
-    answer: "When you buy, you pick a split: 10%, 20%, 25%, 50%, or 100% goes to the Trump Account. The rest loads onto a Visa card the recipient can use anywhere."
+    answer: "When you buy, you pick a split — 10%, 20%, 25%, 50%, 100%, or a custom amount — that goes to the Trump Account. The rest becomes a gift card in the brand you choose (Visa, Amazon, Starbucks, or Walmart) for them to spend."
   },
   {
     question: "What denominations are available?",
-    answer: "$25, $50, $100, $150, $200, $250, and $500."
+    answer: "Any amount — choose a preset ($25 to $500) or enter a custom amount at checkout. Keep in mind Trump Account contributions are capped at $5,000 per child per year, so the invested portion counts toward that limit."
   },
   {
     question: "Who can buy one?",
@@ -31,8 +31,8 @@ const faqs = [
     answer: "Currently at Bank of New York Mellon and Robinhood."
   },
   {
-    question: "Is the spendable portion a real Visa card?",
-    answer: "Yes. It works everywhere Visa is accepted."
+    question: "What gift cards can I choose from?",
+    answer: "The spendable portion is a real gift card in the brand you pick at checkout — Visa, Amazon, Starbucks, or Walmart."
   },
   {
     question: "Is my contribution tax-deductible?",

@@ -2,12 +2,16 @@
  * Money handling. Everything is integer CENTS — no floats anywhere (handoff §5).
  */
 
-/** Trump Account allocation percentages offered on the storefront (§7.1). */
-export type TrumpPercent = 10 | 25 | 50 | 100;
-export const TRUMP_PERCENTS: readonly TrumpPercent[] = [10, 25, 50, 100];
+/**
+ * Trump Account allocation percentage (§7.1). Any whole percent 1–100 is valid;
+ * the storefront still surfaces these presets for quick selection alongside a
+ * custom entry.
+ */
+export type TrumpPercent = number;
+export const TRUMP_PERCENTS: readonly number[] = [10, 25, 50, 100];
 
 export function isTrumpPercent(n: number): n is TrumpPercent {
-  return (TRUMP_PERCENTS as readonly number[]).includes(n);
+  return Number.isInteger(n) && n >= 1 && n <= 100;
 }
 
 /** Guard: a value must be a non-negative safe integer number of cents. */

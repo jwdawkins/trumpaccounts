@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { CartItemInput } from "./api";
+import { GiftDraft } from "./api";
 
-export interface CartLine extends CartItemInput {
+export interface CartLine extends GiftDraft {
   id: string; // client-side line id
 }
 
 interface CartState {
   lines: CartLine[];
-  add: (item: CartItemInput) => void;
+  add: (item: GiftDraft) => void;
   remove: (id: string) => void;
   clear: () => void;
   totalCents: number;
@@ -29,7 +29,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(lines));
   }, [lines]);
 
-  const add = (item: CartItemInput) =>
+  const add = (item: GiftDraft) =>
     setLines((prev) => [...prev, { ...item, id: crypto.randomUUID() }]);
   const remove = (id: string) => setLines((prev) => prev.filter((l) => l.id !== id));
   const clear = () => setLines([]);

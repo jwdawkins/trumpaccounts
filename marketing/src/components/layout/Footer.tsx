@@ -1,10 +1,14 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 export function Footer() {
+  const [location] = useLocation();
+  const jumpTo = (id: string) => {
+    if (location === "/") document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  };
   return (
     <footer className="bg-[#060D18] text-white py-16 mt-0 border-t border-accent">
       <div className="container mx-auto px-4 md:px-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
           <div className="md:col-span-1">
             <Link href="/" className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded border-2 border-accent flex items-center justify-center text-accent font-serif font-bold text-xl">
@@ -23,24 +27,18 @@ export function Footer() {
           <div>
             <h4 className="font-serif font-semibold mb-4 text-accent uppercase tracking-wider text-sm">Product</h4>
             <ul className="space-y-3 text-sm text-[#F5F0E8]">
-              <li><Link href="/shop" className="hover:text-accent transition-colors">Shop Cards</Link></li>
-              <li><Link href="/how-it-works" className="hover:text-accent transition-colors">How It Works</Link></li>
-              <li><Link href="/about-trump-accounts" className="hover:text-accent transition-colors">About Trump Accounts</Link></li>
+              <li><Link href="/shop" className="hover:text-accent transition-colors">Build a Gift Card</Link></li>
+              <li><Link href="/#how-it-works" onClick={() => jumpTo("how-it-works")} className="hover:text-accent transition-colors">How It Works</Link></li>
+              <li><Link href="/#trump-accounts" onClick={() => jumpTo("trump-accounts")} className="hover:text-accent transition-colors">About Trump Accounts</Link></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-serif font-semibold mb-4 text-accent uppercase tracking-wider text-sm">Support</h4>
             <ul className="space-y-3 text-sm text-[#F5F0E8]">
-              <li><Link href="/faq" className="hover:text-accent transition-colors">FAQ</Link></li>
-              <li><Link href="/contact" className="hover:text-accent transition-colors">Contact Us</Link></li>
+              <li><Link href="/#faq" onClick={() => jumpTo("faq")} className="hover:text-accent transition-colors">FAQ</Link></li>
               <li><a href="mailto:support@trumpaccountgiftcards.com" className="hover:text-accent transition-colors">support@trumpaccountgiftcards.com</a></li>
             </ul>
-          </div>
-          
-          <div>
-            <h4 className="font-serif font-semibold mb-4 text-accent uppercase tracking-wider text-sm">Stay Updated</h4>
-            <p className="text-sm text-[#F5F0E8] mb-4 leading-relaxed">Join our waitlist to be notified when we launch in July 2026.</p>
           </div>
         </div>
         

@@ -1,3 +1,9 @@
 <svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+  <!-- Dark navy card base -->
+  <rect width="180" height="180" rx="28" fill="#060D18"/>
+  <!-- Gold-bordered box, filling most of the tile -->
+  <rect x="24" y="24" width="132" height="132" rx="14" fill="#0A1B33" stroke="#C79E4D" stroke-width="11"/>
+  <!-- Big, bold serif gold T (stroke thickens it further) -->
+  <text x="90" y="94" font-family="Georgia, 'Times New Roman', serif" font-size="118" font-weight="700"
+        fill="#C79E4D" stroke="#C79E4D" stroke-width="4" text-anchor="middle" dominant-baseline="central">T</text>
 </svg>

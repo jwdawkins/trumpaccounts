@@ -12,9 +12,10 @@ import {
  * a placed reward so the state machine can be exercised end-to-end offline.
  */
 const RAW: { id: string; name: string; popular: boolean; category: string }[] = [
-  { id: "TREM_STARBUCKS", name: "Starbucks", popular: true, category: "merchant_card" },
+  { id: "TREM_VIRTUAL_VISA", name: "Visa Gift Card", popular: true, category: "visa_card" },
   { id: "TREM_AMAZON", name: "Amazon", popular: true, category: "merchant_card" },
-  { id: "TREM_VIRTUAL_VISA", name: "Virtual Visa", popular: true, category: "visa_card" },
+  { id: "TREM_STARBUCKS", name: "Starbucks", popular: true, category: "merchant_card" },
+  { id: "TREM_WALMART", name: "Walmart", popular: true, category: "merchant_card" },
   { id: "TREM_TARGET", name: "Target", popular: false, category: "merchant_card" },
   { id: "TREM_VENMO", name: "Venmo", popular: false, category: "venmo" },
   { id: "TREM_CHARITY", name: "Red Cross", popular: false, category: "charity" },

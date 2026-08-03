@@ -1,11 +1,10 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { CardConfigurator } from "@/components/CardConfigurator";
-import { WaitlistForm } from "@/components/WaitlistForm";
 import { FAQAccordion } from "@/components/FAQAccordion";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { CheckCircle2, ChevronRight, Gift, PiggyBank, ShieldCheck, TrendingUp, CreditCard } from "lucide-react";
+import { OCCASIONS } from "@/lib/occasions";
 
 export default function Home() {
   return (
@@ -27,14 +26,14 @@ export default function Home() {
                 </h1>
                 <div className="w-24 h-1 bg-accent mb-8" />
                 <p className="text-xl text-[#F5F0E8] mb-12 leading-relaxed max-w-xl font-light">
-                  Give a gift they can spend today — and invest for a lifetime. Trump Account Gift Cards split your gift between a prepaid Visa card and a child's tax-advantaged Trump Account.
+                  Give a gift they can spend today — and invest for a lifetime. Trump Account Gift Cards split your gift between a gift card they can spend and a child's tax-advantaged Trump Account.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 text-lg px-10 h-16 rounded-none font-bold tracking-wide uppercase font-serif">
-                    <a href="#configurator">Build a Gift Card</a>
+                    <Link href="/shop">Build a Gift Card</Link>
                   </Button>
                   <Button asChild size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10 text-lg px-10 h-16 rounded-none font-bold tracking-wide uppercase font-serif bg-transparent">
-                    <Link href="/how-it-works">Learn How It Works</Link>
+                    <a href="#how-it-works">Learn How It Works</a>
                   </Button>
                 </div>
                 {/* Spokesperson mini-callout */}
@@ -74,7 +73,7 @@ export default function Home() {
         </section>
 
         {/* HOW IT WORKS */}
-        <section className="py-24 bg-background">
+        <section id="how-it-works" className="py-24 bg-background scroll-mt-24">
           <div className="container mx-auto px-4 md:px-6 max-w-[1200px]">
             <h2 className="font-serif text-4xl md:text-5xl font-bold text-primary text-center mb-16">How It Works</h2>
             
@@ -90,34 +89,23 @@ export default function Home() {
               </div>
               <div className="flex flex-col items-center">
                 <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mb-6 text-accent shadow-lg border-2 border-accent/20">
-                  <CreditCard size={32} />
+                  <TrendingUp size={32} />
                 </div>
-                <h3 className="font-serif text-2xl font-bold text-primary mb-4">Step 2: They Activate</h3>
+                <h3 className="font-serif text-2xl font-bold text-primary mb-4">Step 2: Verify & Transfer</h3>
                 <p className="text-foreground/80 leading-relaxed text-lg">
-                  Recipient enters card number online and activates their prepaid Visa.
+                  Recipient verifies their Trump Account and the invested portion transfers to their Section 530A account.
                 </p>
               </div>
               <div className="flex flex-col items-center">
                 <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mb-6 text-accent shadow-lg border-2 border-accent/20">
-                  <TrendingUp size={32} />
+                  <CreditCard size={32} />
                 </div>
-                <h3 className="font-serif text-2xl font-bold text-primary mb-4">Step 3: Future Grows</h3>
+                <h3 className="font-serif text-2xl font-bold text-primary mb-4">Step 3: Redeem & Spend</h3>
                 <p className="text-foreground/80 leading-relaxed text-lg">
-                  Trump Account portion transferred to Section 530A investment account.
+                  Recipient redeems their gift card and it's ready to spend.
                 </p>
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* CARD CONFIGURATOR */}
-        <section id="configurator" className="py-24 bg-primary text-white border-y border-accent/30 scroll-mt-20">
-          <div className="container mx-auto px-4 md:px-6 max-w-[1200px]">
-            <div className="text-center mb-16">
-              <h2 className="font-serif text-4xl md:text-5xl font-bold text-accent mb-4">Build Your Gift</h2>
-              <p className="text-xl text-[#F5F0E8] font-light">See the power of giving today and investing for tomorrow</p>
-            </div>
-            <CardConfigurator />
           </div>
         </section>
 
@@ -168,7 +156,7 @@ export default function Home() {
         </section>
 
         {/* WHAT IS A TRUMP ACCOUNT? */}
-        <section className="py-24 bg-primary text-white border-y border-accent/30">
+        <section id="trump-accounts" className="py-24 bg-primary text-white border-y border-accent/30 scroll-mt-24">
           <div className="container mx-auto px-4 md:px-6 max-w-[1200px]">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
               <div>
@@ -184,10 +172,6 @@ export default function Home() {
                   </li>
                   <li className="flex items-start gap-4">
                     <div className="w-2 h-2 rounded-full bg-accent mt-2.5 shrink-0" />
-                    <span>Every child born 2025–2028 receives a free $1,000 from the U.S. Treasury</span>
-                  </li>
-                  <li className="flex items-start gap-4">
-                    <div className="w-2 h-2 rounded-full bg-accent mt-2.5 shrink-0" />
                     <span>Families can contribute up to $5,000 per year</span>
                   </li>
                   <li className="flex items-start gap-4">
@@ -196,7 +180,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-start gap-4">
                     <div className="w-2 h-2 rounded-full bg-accent mt-2.5 shrink-0" />
-                    <span>At age 18, converts to a traditional IRA</span>
+                    <span>At 18, the account transfers to the child's control to manage and use for their future goals</span>
                   </li>
                 </ul>
                 <div className="mt-10">
@@ -273,36 +257,30 @@ export default function Home() {
           <div className="container mx-auto px-4 md:px-6 max-w-[1200px]">
             <h2 className="font-serif text-4xl md:text-5xl font-bold text-accent text-center mb-16">The Perfect Gift for Every Occasion</h2>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-              {['Birthdays', 'Baby Showers', 'Holidays', 'Milestones', 'Just Because'].map((occasion, i) => (
-                <div key={i} className="border border-accent/30 bg-primary p-8 flex flex-col items-center justify-center text-center group hover:bg-accent/5 transition-colors">
-                  <div className="w-12 h-12 rounded-full border border-accent text-accent flex items-center justify-center mb-4">
+              {OCCASIONS.map((occasion) => (
+                <Link
+                  key={occasion.slug}
+                  href={`/shop?occasion=${occasion.slug}`}
+                  className="border border-accent/30 bg-primary p-8 flex flex-col items-center justify-center text-center group hover:bg-accent/5 hover:border-accent transition-colors cursor-pointer"
+                >
+                  <div className="w-12 h-12 rounded-full border border-accent text-accent flex items-center justify-center mb-4 group-hover:bg-accent group-hover:text-accent-foreground transition-colors">
                     <Gift size={24} />
                   </div>
-                  <h3 className="font-serif font-bold text-xl text-white group-hover:text-accent transition-colors">{occasion}</h3>
-                </div>
+                  <h3 className="font-serif font-bold text-xl text-white group-hover:text-accent transition-colors">{occasion.label}</h3>
+                </Link>
               ))}
             </div>
           </div>
         </section>
 
         {/* FAQ */}
-        <section className="py-24 bg-background">
+        <section id="faq" className="py-24 bg-background scroll-mt-24">
           <div className="container mx-auto px-4 md:px-6 max-w-[1200px]">
             <h2 className="font-serif text-4xl md:text-5xl font-bold text-primary text-center mb-16">Frequently Asked Questions</h2>
             <FAQAccordion />
           </div>
         </section>
 
-        {/* WAITLIST CTA */}
-        <section className="py-24 bg-primary relative overflow-hidden">
-          <div className="container mx-auto px-4 md:px-6 relative z-10 max-w-[1200px]">
-            <div className="text-center mb-12">
-              <h2 className="font-serif text-4xl md:text-5xl font-bold text-accent mb-6">Be First to Give the Gift That Grows</h2>
-              <p className="text-xl text-white/90 font-light">Trump Account Gift Cards launch July 2026. Join the waitlist to be notified.</p>
-            </div>
-            <WaitlistForm />
-          </div>
-        </section>
       </main>
 
       <Footer />
