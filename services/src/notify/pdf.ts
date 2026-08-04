@@ -7,6 +7,7 @@ import {
   TRUMP_ACCOUNT_FACTS,
   PROJECTION_DISCLAIMER,
   RETURN_LABEL,
+  verifiedNotice,
 } from "./gift-summary";
 import { BRAND_ART } from "./brand-art";
 
@@ -22,6 +23,10 @@ function brandArtKey(brandName?: string): string | null {
 
 export interface CertificateInput {
   recipientName?: string;
+  /** Gifter's display name — shown as "From …" when present. */
+  fromName?: string;
+  /** VERIFIED gifts show the name-match notice. */
+  verificationMode?: "OPEN" | "VERIFIED";
   message?: string;
   amountCents: number;
   trumpPercent: number;
@@ -73,10 +78,11 @@ export async function generateCertificatePdf(input: CertificateInput): Promise<U
   // Outer frame
   page.drawRectangle({ x: 24, y: 24, width: PAGE_W - 48, height: PAGE_H - 48, borderColor: hx("#DCCB9E"), borderWidth: 1.5 });
 
-  // Title
-  const name = input.recipientName ? safe(input.recipientName) : "You";
+  // Title + gifter
+  const rname = input.recipientName ? safe(input.recipientName) : "";
   center("A GIFT TOWARD", MID, 744, 11, bold, GOLD);
-  center(`${name.toUpperCase()}'S FUTURE`, MID, 720, 23, serif, INK);
+  center(rname ? `${rname.toUpperCase()}'S FUTURE` : "YOUR FUTURE", MID, 720, 23, serif, INK);
+  if (input.fromName) center(`from ${safe(input.fromName)}`, MID, 706, 10, italic, MUTED);
 
   // ---------- The gift card ----------
   const cardW = 388, cardH = 202;
@@ -152,9 +158,30 @@ export async function generateCertificatePdf(input: CertificateInput): Promise<U
     by -= 16;
   }
 
+  // ---------- Verified-gift notice (name must match) ----------
+  if (input.recipientName && input.verificationMode !== "OPEN") {
+    const notice = safe(verifiedNotice(input.recipientName));
+    const words = notice.split(" ");
+    const maxW = 470;
+    let line = "";
+    const lines: string[] = [];
+    for (const word of words) {
+      const t = line ? `${line} ${word}` : word;
+      if (w(t, 8, helv) > maxW) {
+        lines.push(line);
+        line = word;
+      } else line = t;
+    }
+    if (line) lines.push(line);
+    // Light amber box around the notice.
+    const boxTop = 96,
+      boxH = lines.length * 11 + 12;
+    page.drawRectangle({ x: 40, y: boxTop - boxH, width: PAGE_W - 80, height: boxH, borderColor: GOLD, borderWidth: 0.75 });
+    lines.forEach((ln, i) => center(ln, MID, boxTop - 14 - i * 11, 8, helv, hx("#7A5A12")));
+  }
+
   // ---------- Footer disclaimer ----------
-  const disc = PROJECTION_DISCLAIMER;
-  center(disc.length > 130 ? disc : disc, MID, 40, 6.5, helv, MUTED);
+  center(PROJECTION_DISCLAIMER, MID, 34, 6.5, helv, MUTED);
 
   return doc.save();
 }

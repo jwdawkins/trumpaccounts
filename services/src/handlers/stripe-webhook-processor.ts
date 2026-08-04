@@ -5,11 +5,14 @@ import { markOrderPaidAndOpenCards } from "../fulfillment/on-paid";
 import { dispatchDelivery } from "../fulfillment/deliver";
 import { buildOrderSummaryHtml } from "../notify/email";
 import { sendBrevoEmail } from "../notify/brevo";
+import { getCertificate } from "../notify/store";
 import { CardState, isTerminal } from "../domain/states";
 import { newEventId } from "../domain/tokens";
 
 const repo = new Repo(requireEnv("TABLE_NAME"));
 const WEB_BASE_URL = requireEnv("WEB_BASE_URL");
+const ASSETS_BUCKET = requireEnv("ASSETS_BUCKET");
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30);
 
 /**
  * SQS-triggered processor for normalized payment events (handoff §6.2).
@@ -66,6 +69,15 @@ async function handleCheckoutCompleted(
   // failure here must not fail the webhook (fulfillment already succeeded).
   if (found.order.buyerEmail) {
     try {
+      const attachments: { name: string; content: string }[] = [];
+      for (let i = 0; i < found.cards.length; i++) {
+        const c = found.cards[i];
+        const pdf = await getCertificate(ASSETS_BUCKET, c.cardId);
+        if (pdf) {
+          const label = c.recipientName ? slug(c.recipientName) : `card-${i + 1}`;
+          attachments.push({ name: `gift-${label}.pdf`, content: Buffer.from(pdf).toString("base64") });
+        }
+      }
       await sendBrevoEmail({
         to: found.order.buyerEmail,
         subject: "Your gift order is confirmed",
@@ -74,6 +86,7 @@ async function handleCheckoutCompleted(
           cards: found.cards.map((c) => ({
             recipientName: c.recipientName,
             amountCents: c.totalAmount,
+            trumpPercent: c.trumpPercent,
             brandName: c.brandName,
             deliveryMethod: c.deliveryMethod,
             recipientEmail: c.recipientEmail,
@@ -81,6 +94,7 @@ async function handleCheckoutCompleted(
             sendDate: c.sendDate,
           })),
         }),
+        attachments: attachments.length ? attachments : undefined,
       });
     } catch (e) {
       console.warn(JSON.stringify({ msg: "buyer summary email failed", orderId: found.order.orderId, error: (e as Error).message }));

@@ -31,6 +31,8 @@ export async function dispatchDelivery(
 
   const content = {
     recipientName: card.recipientName,
+    fromName: card.fromName,
+    verificationMode: card.verificationMode,
     message: card.message,
     amountCents: card.totalAmount,
     trumpPercent: card.trumpPercent,

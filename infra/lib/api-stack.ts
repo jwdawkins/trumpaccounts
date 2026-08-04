@@ -341,6 +341,7 @@ export class ApiStack extends Stack {
     giftcardQueue.grantSendMessages(trumpFundingWorkerFn);
     webhookQueue.grantSendMessages(webhookReceiverFn);
     assetsBucket.grantPut(webhookProcessorFn);
+    assetsBucket.grantRead(webhookProcessorFn);
     assetsBucket.grantRead(getCertificateFn);
     assetsBucket.grantRead(orderCertificateFn);
     assetsBucket.grantRead(orderCertZipFn);
