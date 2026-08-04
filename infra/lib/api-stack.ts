@@ -281,6 +281,17 @@ export class ApiStack extends Stack {
       targets: [new targets.LambdaFunction(trumpFundingSweeperFn)],
     });
 
+    // Daily dispatcher — sends scheduled gifts whose send date has arrived (~8am ET).
+    const dispatchScheduledFn = makeFn("DispatchScheduledFn", "dispatch-scheduled.ts", {
+      ASSETS_BUCKET: assetsBucket.bucketName,
+      BREVO_SECRET_ARN: brevoSecret.secretArn,
+    });
+    new events.Rule(this, "ScheduledDispatchRule", {
+      ruleName: `${APP_NAME}-${cfg.stage}-scheduled-dispatch`,
+      schedule: events.Schedule.cron({ minute: "0", hour: "13" }), // 13:00 UTC
+      targets: [new targets.LambdaFunction(dispatchScheduledFn)],
+    });
+
     // Admin ops (verification & fulfillment). Cognito JWT + admins-group check.
     // adminGiftcardFn only ENQUEUES — it gets the queue URL, never the order key.
     const adminVerifyFn = makeFn("AdminVerifyFn", "admin-verify.ts");
@@ -336,6 +347,9 @@ export class ApiStack extends Stack {
     assetsBucket.grantRead(sendGiftEmailFn);
     brevoSecret.grantRead(sendGiftEmailFn);
     brevoSecret.grantRead(webhookProcessorFn);
+    brevoSecret.grantRead(dispatchScheduledFn);
+    table.grantReadWriteData(dispatchScheduledFn);
+    assetsBucket.grantRead(dispatchScheduledFn);
     // SES send, scoped to the verified sender identity.
     webhookProcessorFn.addToRolePolicy(
       new iam.PolicyStatement({

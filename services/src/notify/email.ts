@@ -1,5 +1,5 @@
-import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { DeliveryMethod } from "../domain/types";
+import { sendBrevoEmail } from "./brevo";
 import {
   computeGiftSummary,
   formatDollars,
@@ -10,11 +10,7 @@ import {
   BRAND,
 } from "./gift-summary";
 
-const client = new SESv2Client({});
-
 export interface ClaimEmailInput {
-  to: string;
-  fromAddress: string;
   recipientName?: string;
   message?: string;
   amountCents: number;
@@ -252,21 +248,16 @@ function textVersion(input: ClaimEmailInput): string {
   ].join("\n");
 }
 
-/** Send the gift-reveal / claim email via SES (§6.4). No amounts in the subject (§8). */
-export async function sendClaimEmail(input: ClaimEmailInput): Promise<void> {
-  await client.send(
-    new SendEmailCommand({
-      FromEmailAddress: input.fromAddress,
-      Destination: { ToAddresses: [input.to] },
-      Content: {
-        Simple: {
-          Subject: { Data: "You've received a gift" },
-          Body: {
-            Html: { Data: buildClaimEmailHtml(input) },
-            Text: { Data: textVersion(input) },
-          },
-        },
-      },
-    }),
-  );
+/**
+ * Send the gift-reveal / claim email via Brevo (no amounts in the subject, §8).
+ * The certificate PDF (with the claim QR) is attached when provided.
+ */
+export async function sendClaimEmail(to: string, input: ClaimEmailInput, pdf?: Uint8Array): Promise<void> {
+  await sendBrevoEmail({
+    to,
+    subject: "You've received a gift",
+    html: buildClaimEmailHtml(input),
+    text: textVersion(input),
+    attachments: pdf ? [{ name: "trump-account-gift.pdf", content: Buffer.from(pdf).toString("base64") }] : undefined,
+  });
 }

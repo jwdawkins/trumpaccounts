@@ -8,63 +8,57 @@ export function claimUrl(webBaseUrl: string, rawToken: string): string {
   return `${webBaseUrl.replace(/\/$/, "")}/claim/${rawToken}`;
 }
 
-const PLACEHOLDER_FROM = "no-reply@example.com";
-
 /**
  * Deliver a claim (§6.4 / D2).
  *
- * A downloadable PDF gift certificate (QR of the claim link) is ALWAYS
- * generated and stored in the private assets bucket, so every gift can be
- * downloaded/shared regardless of channel. On top of that:
- *   EMAIL → also emailed via SES (best-effort; skipped/logged if SES isn't
- *           configured yet, so it never blocks fulfillment)
- *   SMS   → ON HOLD (logged) until Twilio is wired
+ * A downloadable PDF gift certificate (QR of the claim link) is ALWAYS generated
+ * and stored, so every gift can be downloaded/shared regardless of channel. On
+ * top of that, for EMAIL delivery:
+ *   - if the scheduled send date is due (today/past, or none) → email now via
+ *     Brevo (claim email + the certificate attached), and report emailSent.
+ *   - if the send date is in the future → HELD; the daily dispatcher sends it on
+ *     the date. SMS is on hold (Twilio pending). SELF is PDF-only.
  *
  * The raw token is used here and never persisted (§8); it lives only inside the
- * stored certificate PDF in the private, encrypted bucket.
+ * stored certificate PDF and (for a due send) the email we send now.
  */
 export async function dispatchDelivery(
   card: Card,
   rawToken: string,
   webBaseUrl: string,
-): Promise<void> {
+): Promise<{ emailSent: boolean }> {
   const url = claimUrl(webBaseUrl, rawToken);
 
-  // Always produce a downloadable certificate.
-  const pdf = await generateCertificatePdf({
+  const content = {
     recipientName: card.recipientName,
     message: card.message,
     amountCents: card.totalAmount,
     trumpPercent: card.trumpPercent,
     brandName: card.brandName,
     claimUrl: url,
-  });
+  };
+  const pdf = await generateCertificatePdf(content);
   await storeCertificate(requireEnv("ASSETS_BUCKET"), card.cardId, pdf);
 
-  // Channel-specific delivery on top.
-  const from = process.env.SES_FROM_ADDRESS;
-  if (card.deliveryMethod === "EMAIL" && card.recipientEmail && from && from !== PLACEHOLDER_FROM) {
-    try {
-      await sendClaimEmail({
-        to: card.recipientEmail,
-        fromAddress: from,
-        recipientName: card.recipientName,
-        message: card.message,
-        amountCents: card.totalAmount,
-        trumpPercent: card.trumpPercent,
-        brandName: card.brandName,
-        claimUrl: url,
-      });
-    } catch (e) {
-      console.warn(
-        JSON.stringify({ msg: "email delivery failed", cardId: card.cardId, error: (e as Error).message }),
-      );
+  if (card.deliveryMethod === "EMAIL" && card.recipientEmail) {
+    const today = new Date().toISOString().slice(0, 10);
+    const due = !card.sendDate || card.sendDate <= today;
+    if (due) {
+      try {
+        await sendClaimEmail(card.recipientEmail, content, pdf);
+        return { emailSent: true };
+      } catch (e) {
+        console.warn(
+          JSON.stringify({ msg: "email delivery failed", cardId: card.cardId, error: (e as Error).message }),
+        );
+        return { emailSent: false };
+      }
     }
+    console.log(JSON.stringify({ msg: "email held for scheduled send date", cardId: card.cardId, sendDate: card.sendDate }));
   } else if (card.deliveryMethod === "SMS") {
     console.log(JSON.stringify({ msg: "SMS delivery on hold (Twilio pending)", cardId: card.cardId }));
-  } else if (card.deliveryMethod === "EMAIL") {
-    console.log(JSON.stringify({ msg: "email skipped (SES sender not configured)", cardId: card.cardId }));
   }
+  return { emailSent: false };
 }
 
 function requireEnv(name: string): string {

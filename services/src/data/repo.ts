@@ -235,6 +235,20 @@ export class Repo {
    * Cards whose scheduled Trump-funding retry is due (trumpFundingRetryAt <= now).
    * Table Scan with a filter — fine at dev scale; add a GSI before prod volume.
    */
+  /** OPEN email cards whose scheduled send date is due and not yet sent. */
+  async listScheduledDeliveriesDue(today: string): Promise<Card[]> {
+    const r = await this.doc.send(
+      new ScanCommand({
+        TableName: this.table,
+        FilterExpression:
+          "entityType = :card AND #st = :open AND deliveryMethod = :email AND attribute_exists(sendDate) AND sendDate <= :today AND attribute_not_exists(deliverySentAt)",
+        ExpressionAttributeNames: { "#st": "state" },
+        ExpressionAttributeValues: { ":card": "CARD", ":open": "OPEN", ":email": "EMAIL", ":today": today },
+      }),
+    );
+    return (r.Items ?? []).map((i) => this.toCard(i));
+  }
+
   async listFundingRetriesDue(nowIso: string): Promise<Card[]> {
     const r = await this.doc.send(
       new ScanCommand({

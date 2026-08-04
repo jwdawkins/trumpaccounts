@@ -55,7 +55,11 @@ async function handleCheckoutCompleted(
     sessionId: evt.sessionId,
   });
   for (const { card, token } of issued) {
-    await dispatchDelivery(card, token, WEB_BASE_URL);
+    const { emailSent } = await dispatchDelivery(card, token, WEB_BASE_URL);
+    if (emailSent) {
+      const now = new Date().toISOString();
+      await repo.saveCard({ ...card, deliverySentAt: now, updatedAt: now });
+    }
   }
 
   // One order-summary email to the buyer, with a status link. Best-effort — a

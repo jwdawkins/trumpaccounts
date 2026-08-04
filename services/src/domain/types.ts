@@ -66,6 +66,8 @@ export interface Card {
   readonly recipientEmail?: string;
   /** Scheduled send date (YYYY-MM-DD) — when the email/text goes out. */
   readonly sendDate?: string;
+  /** Set once the recipient email/text has actually been sent (dispatch idempotency). */
+  readonly deliverySentAt?: string;
   readonly recipientPhone?: string;
 
   // State machine (§4).
