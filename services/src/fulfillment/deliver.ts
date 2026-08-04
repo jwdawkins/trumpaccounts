@@ -26,12 +26,14 @@ export async function dispatchDelivery(
   card: Card,
   rawToken: string,
   webBaseUrl: string,
+  gifterEmail?: string,
 ): Promise<{ emailSent: boolean }> {
   const url = claimUrl(webBaseUrl, rawToken);
 
   const content = {
     recipientName: card.recipientName,
     fromName: card.fromName,
+    fromEmail: gifterEmail,
     verificationMode: card.verificationMode,
     message: card.message,
     amountCents: card.totalAmount,

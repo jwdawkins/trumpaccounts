@@ -1,5 +1,6 @@
 import { DeliveryMethod } from "../domain/types";
 import { sendBrevoEmail } from "./brevo";
+import { BRAND_ART } from "./brand-art";
 import {
   computeGiftSummary,
   formatDollars,
@@ -31,15 +32,31 @@ const SERIF = "font-family:Georgia,'Times New Roman',serif";
 const esc = (t: string) =>
   t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-/** Hosted brand logo (faded art on the marketing site) for the email card. */
-const BRAND_LOGO_BASE = "https://trumpaccountgiftcards.com/brands";
-function brandLogoUrl(brandName?: string): string | null {
+function brandKey(brandName?: string): string | null {
   if (!brandName) return null;
   const n = brandName.toLowerCase();
   for (const key of ["amazon", "visa", "starbucks", "walmart"]) {
-    if (n.includes(key)) return `${BRAND_LOGO_BASE}/${key}.png`;
+    if (n.includes(key)) return key;
   }
   return null;
+}
+
+/**
+ * Inline (CID) brand-logo attachments for the given brands, deduped. Referenced
+ * in the card block as <img src="cid:brand-<key>.png"> so Outlook shows the logo
+ * without "download pictures". Pass these alongside the email's other attachments.
+ */
+export function brandInlineAttachments(brandNames: (string | undefined)[]): { name: string; content: string }[] {
+  const seen = new Set<string>();
+  const out: { name: string; content: string }[] = [];
+  for (const bn of brandNames) {
+    const k = brandKey(bn);
+    if (k && !seen.has(k)) {
+      seen.add(k);
+      out.push({ name: `brand-${k}.png`, content: BRAND_ART[k] });
+    }
+  }
+  return out;
 }
 
 /** Full HTML document: outer paper bg + fixed-width navy card. Outlook-safe. */
@@ -178,7 +195,7 @@ export function buildOrderSummaryHtml(input: OrderSummaryInput): string {
 
 /** The gift card block: brand + amount + logo, split bar, invested/spendable. */
 function cardBlock(input: ClaimEmailInput, s: ReturnType<typeof computeGiftSummary>): string {
-  const logoUrl = brandLogoUrl(input.brandName);
+  const key = brandKey(input.brandName);
   return `
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${navyLift}" style="background-color:${navyLift};border:1px solid ${BORDER}">
         <tr>
@@ -199,8 +216,8 @@ function cardBlock(input: ClaimEmailInput, s: ReturnType<typeof computeGiftSumma
                   }
                 </td>
                 ${
-                  logoUrl
-                    ? `<td valign="top" align="right" width="96"><img src="${logoUrl}" alt="${esc(input.brandName || "")}" width="96" height="96" style="display:block;border:0"></td>`
+                  key
+                    ? `<td valign="top" align="right" width="96"><img src="cid:brand-${key}.png" alt="${esc(input.brandName || "")}" width="96" height="96" style="display:block;border:0"></td>`
                     : ""
                 }
               </tr>
@@ -253,6 +270,8 @@ export interface ClaimEmailInput {
   recipientName?: string;
   /** Gifter's display name — shown as the sender ("From …"). */
   fromName?: string;
+  /** Gifter's email — recipients email this to request a name change. */
+  fromEmail?: string;
   /** VERIFIED gifts show the name-match notice. */
   verificationMode?: "OPEN" | "VERIFIED";
   message?: string;
@@ -279,15 +298,15 @@ export function buildClaimEmailHtml(input: ClaimEmailInput): string {
       <p style="color:#c9d3e0;font-size:14px;line-height:1.5;margin:0 0 22px;${SANS}">${greeting} ${
         input.fromName ? `<strong style="color:#ffffff">${esc(input.fromName)}</strong>` : "someone"
       } sent you a gift toward your future &mdash; cash to spend today, plus an investment in a tax-advantaged Trump Account.</p>
+      ${
+        input.message
+          ? `<p style="color:#aeb8c7;font-style:italic;font-size:13px;text-align:center;margin:0 8px 16px;${SANS}">&ldquo;${esc(input.message)}&rdquo;</p>`
+          : ""
+      }
       ${cardBlock(input, s)}
       ${
         input.recipientName && input.verificationMode !== "OPEN"
-          ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#1a1710" style="background-color:#1a1710;border:1px solid ${gold};margin-top:10px"><tr><td style="padding:12px 14px"><div style="color:${gold};font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;${SANS}">Name-verified gift</div><div style="color:#d9c9a6;font-size:12px;line-height:1.5;${SANS}">${esc(verifiedNotice(input.recipientName))}</div></td></tr></table>`
-          : ""
-      }
-      ${
-        input.message
-          ? `<p style="color:#aeb8c7;font-style:italic;font-size:13px;text-align:center;margin:16px 8px;${SANS}">&ldquo;${esc(input.message)}&rdquo;</p>`
+          ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#1a1710" style="background-color:#1a1710;border:1px solid ${gold};margin-top:10px"><tr><td style="padding:12px 14px"><div style="color:${gold};font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;${SANS}">Name-verified gift</div><div style="color:#d9c9a6;font-size:12px;line-height:1.5;${SANS}">${esc(verifiedNotice(input.recipientName, input.fromEmail))}</div></td></tr></table>`
           : ""
       }
       ${infographics(s)}
@@ -323,11 +342,13 @@ function textVersion(input: ClaimEmailInput): string {
  * The certificate PDF (with the claim QR) is attached when provided.
  */
 export async function sendClaimEmail(to: string, input: ClaimEmailInput, pdf?: Uint8Array): Promise<void> {
+  const attachments = brandInlineAttachments([input.brandName]);
+  if (pdf) attachments.push({ name: "trump-account-gift.pdf", content: Buffer.from(pdf).toString("base64") });
   await sendBrevoEmail({
     to,
     subject: "You've received a gift",
     html: buildClaimEmailHtml(input),
     text: textVersion(input),
-    attachments: pdf ? [{ name: "trump-account-gift.pdf", content: Buffer.from(pdf).toString("base64") }] : undefined,
+    attachments: attachments.length ? attachments : undefined,
   });
 }

@@ -25,6 +25,8 @@ export interface CertificateInput {
   recipientName?: string;
   /** Gifter's display name — shown as "From …" when present. */
   fromName?: string;
+  /** Gifter's email — recipients email this to request a name change. */
+  fromEmail?: string;
   /** VERIFIED gifts show the name-match notice. */
   verificationMode?: "OPEN" | "VERIFIED";
   message?: string;
@@ -84,10 +86,17 @@ export async function generateCertificatePdf(input: CertificateInput): Promise<U
   center(rname ? `${rname.toUpperCase()}'S FUTURE` : "YOUR FUTURE", MID, 720, 23, serif, INK);
   if (input.fromName) center(`from ${safe(input.fromName)}`, MID, 706, 10, italic, MUTED);
 
+  // ---------- Message (above the card, so it flows into the gift) ----------
+  if (input.message) {
+    const raw = safe(input.message);
+    const msg = raw.length > 150 ? `${raw.slice(0, 147)}...` : raw;
+    center(`"${msg}"`, MID, 690, 11, italic, MUTED);
+  }
+
   // ---------- The gift card ----------
   const cardW = 388, cardH = 202;
   const cardX = (PAGE_W - cardW) / 2;
-  const cardY = 496; // bottom edge; spans 496..698
+  const cardY = 470; // bottom edge
   page.drawRectangle({ x: cardX, y: cardY, width: cardW, height: cardH, color: NAVY, borderColor: GOLD, borderWidth: 1 });
   // Brand art faded into the card's top-right corner (matches the site card).
   const artKey = brandArtKey(input.brandName);
@@ -104,8 +113,12 @@ export async function generateCertificatePdf(input: CertificateInput): Promise<U
   const cardLabel = input.brandName ? safe(input.brandName).toUpperCase() : "GIFT CARD";
   at("TRUMP ACCOUNT", px + tBox + 12, tY + tBox - 14, 12, bold, WHITE);
   at(cardLabel, px + tBox + 12, tY + 2, 8, bold, GOLD);
-  // amount
+  // amount + "To <recipient>" on the card (like the site)
   at(formatDollars(input.amountCents), px, cardY + 96, 32, serif, WHITE);
+  if (rname) {
+    at("TO", px, cardY + 74, 8, bold, GOLD);
+    at(rname, px + w("TO", 8, bold) + 6, cardY + 73, 12, serif, WHITE);
+  }
   // split bar
   const barW = cardW - 52, barH = 9, barY = cardY + 58;
   const goldW = (barW * s.trumpPercent) / 100;
@@ -116,13 +129,6 @@ export async function generateCertificatePdf(input: CertificateInput): Promise<U
   at(formatCents(s.investedCents), px, cardY + 17, 12, bold, WHITE);
   rightOf("SPENDABLE", px + barW, cardY + 34, 7, bold, rgb(0.8, 0.83, 0.88));
   rightOf(formatCents(s.spendableCents), px + barW, cardY + 17, 12, bold, WHITE);
-
-  // ---------- Message ----------
-  if (input.message) {
-    const raw = safe(input.message);
-    const msg = raw.length > 150 ? `${raw.slice(0, 147)}...` : raw;
-    center(`"${msg}"`, MID, 472, 11, italic, MUTED);
-  }
 
   // ---------- Infographics ----------
   const infoY = 380, infoH = 80, gap = 18, frameM = 48;
@@ -160,7 +166,7 @@ export async function generateCertificatePdf(input: CertificateInput): Promise<U
 
   // ---------- Verified-gift notice (name must match) ----------
   if (input.recipientName && input.verificationMode !== "OPEN") {
-    const notice = safe(verifiedNotice(input.recipientName));
+    const notice = safe(verifiedNotice(input.recipientName, input.fromEmail));
     const words = notice.split(" ");
     const maxW = 470;
     let line = "";

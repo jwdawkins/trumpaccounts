@@ -3,7 +3,7 @@ import { Repo } from "../data/repo";
 import { PaymentEvent } from "../payments/provider";
 import { markOrderPaidAndOpenCards } from "../fulfillment/on-paid";
 import { dispatchDelivery } from "../fulfillment/deliver";
-import { buildOrderSummaryHtml } from "../notify/email";
+import { buildOrderSummaryHtml, brandInlineAttachments } from "../notify/email";
 import { sendBrevoEmail } from "../notify/brevo";
 import { getCertificate } from "../notify/store";
 import { CardState, isTerminal } from "../domain/states";
@@ -58,7 +58,7 @@ async function handleCheckoutCompleted(
     sessionId: evt.sessionId,
   });
   for (const { card, token } of issued) {
-    const { emailSent } = await dispatchDelivery(card, token, WEB_BASE_URL);
+    const { emailSent } = await dispatchDelivery(card, token, WEB_BASE_URL, found.order.buyerEmail);
     if (emailSent) {
       const now = new Date().toISOString();
       await repo.saveCard({ ...card, deliverySentAt: now, updatedAt: now });
@@ -78,6 +78,8 @@ async function handleCheckoutCompleted(
           attachments.push({ name: `gift-${label}.pdf`, content: Buffer.from(pdf).toString("base64") });
         }
       }
+      // Inline (CID) brand logos so the card image shows without "download pictures".
+      attachments.push(...brandInlineAttachments(found.cards.map((c) => c.brandName)));
       await sendBrevoEmail({
         to: found.order.buyerEmail,
         subject: "Your gift order is confirmed",

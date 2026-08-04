@@ -46,13 +46,14 @@ export function formatDollars(cents: number): string {
 
 export { formatCents };
 
-/** Where a recipient goes to fix a name mismatch on a verified gift. */
-export const SUPPORT_EMAIL = "support@trumpaccountgiftcards.com";
-
-/** Notice shown on name-verified gifts (the Trump Account name must match). */
-export function verifiedNotice(recipientName?: string): string {
+/**
+ * Notice shown on name-verified gifts. Only the gifter can change the name, so
+ * the recipient is directed to email the gifter (the address they logged in with).
+ */
+export function verifiedNotice(recipientName?: string, gifterEmail?: string): string {
   const who = recipientName ? `${recipientName}` : "the named recipient";
-  return `This gift is reserved for ${who}'s Trump Account. The account holder's name must match. If it doesn't, email ${SUPPORT_EMAIL} to update the name before claiming.`;
+  const contact = gifterEmail ? `email the gifter at ${gifterEmail}` : "contact the gifter";
+  return `This gift is reserved for ${who}'s Trump Account. The account holder's name must match. Only the gifter can change the name. To request an update before claiming, ${contact}.`;
 }
 
 export const RETURN_LABEL = "8% avg. annual return";
