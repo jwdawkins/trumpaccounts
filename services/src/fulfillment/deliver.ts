@@ -35,6 +35,8 @@ export async function dispatchDelivery(
     recipientName: card.recipientName,
     message: card.message,
     amountCents: card.totalAmount,
+    trumpPercent: card.trumpPercent,
+    brandName: card.brandName,
     claimUrl: url,
   });
   await storeCertificate(requireEnv("ASSETS_BUCKET"), card.cardId, pdf);
@@ -47,6 +49,10 @@ export async function dispatchDelivery(
         to: card.recipientEmail,
         fromAddress: from,
         recipientName: card.recipientName,
+        message: card.message,
+        amountCents: card.totalAmount,
+        trumpPercent: card.trumpPercent,
+        brandName: card.brandName,
         claimUrl: url,
       });
     } catch (e) {

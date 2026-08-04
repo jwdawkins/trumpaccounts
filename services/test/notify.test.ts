@@ -20,6 +20,7 @@ describe("generateCertificatePdf", () => {
   it("produces a valid, non-trivial PDF with a QR", async () => {
     const bytes = await generateCertificatePdf({
       amountCents: 5000,
+      trumpPercent: 50,
       claimUrl: "http://localhost:5173/claim/ABC123",
       recipientName: "Sam",
       message: "Happy birthday!",

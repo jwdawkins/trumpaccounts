@@ -9,6 +9,8 @@ export interface CartItemInput {
   trumpPercent: number;
   allowedGiftCardProducts?: string[];
   selectedGiftCardProduct?: string;
+  /** Display-only brand of the spendable card (e.g. "Amazon"), shown on the gift. */
+  brandName?: string;
   /** OPEN (no name check) or VERIFIED (name must match). Defaults from name presence. */
   verificationMode?: VerificationMode;
   recipientName?: string;
@@ -119,6 +121,7 @@ export function buildOrderFromCart(
       giftCardAmount: giftCardCents,
       allowedGiftCardProducts: is100 ? [] : item.allowedGiftCardProducts ?? [],
       selectedGiftCardProduct: undefined,
+      brandName: is100 ? undefined : item.brandName,
       fromName: opts.fromName,
       verificationMode: mode,
       recipientName,

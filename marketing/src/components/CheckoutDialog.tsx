@@ -32,6 +32,7 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
           totalAmount: l.totalAmount,
           trumpPercent: l.trumpPercent,
           allowedGiftCardProducts: l.allowedGiftCardProducts,
+          brandName: l.brandName,
           verificationMode: l.verificationMode ?? "OPEN",
           recipientName: l.recipientName,
           message: l.message,

@@ -33,6 +33,7 @@ export interface CartItemInput {
   totalAmount: number; // cents
   trumpPercent: TrumpPercent;
   allowedGiftCardProducts?: string[];
+  brandName?: string;
   verificationMode: VerificationMode;
   recipientName?: string;
   message?: string;

@@ -50,6 +50,8 @@ export interface Card {
   readonly selectedGiftCardProduct?: string;
   /** Tremendous category of the selected product (drives fee handling). */
   readonly selectedGiftCardCategory?: string;
+  /** Display-only brand name of the spendable card (e.g. "Amazon"), shown on the gift. */
+  readonly brandName?: string;
 
   // Sender + recipient + delivery (D2/D3).
   /** Display name of the gifter shown to the recipient ("A gift from …"). */
