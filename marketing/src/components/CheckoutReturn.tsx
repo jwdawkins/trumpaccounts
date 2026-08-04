@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { OrderView } from "@/components/OrderView";
 
 /**
  * Handles the post-Stripe redirect. The checkout handler sends buyers back to
@@ -35,21 +36,24 @@ export function CheckoutReturn() {
   const success = state.status === "success";
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-primary border border-accent/30 shadow-2xl p-8 text-center text-white">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
+      <div className="w-full max-w-lg bg-primary border border-accent/30 shadow-2xl p-8 text-center text-white my-8">
         {success ? (
           <>
             <CheckCircle2 className="mx-auto text-accent" size={56} strokeWidth={1.5} />
-            <h2 className="mt-4 text-2xl font-serif font-bold text-accent">Payment received!</h2>
+            <h2 className="mt-4 text-2xl font-serif font-bold text-accent">Your gift is confirmed</h2>
             <p className="mt-3 text-sm text-white/70 leading-relaxed">
-              Thank you — your gift is confirmed. We&rsquo;re funding the Trump Account portion and preparing the gift
-              card now. Each recipient gets theirs by email or text on the scheduled send date.
+              Thank you — your gift is confirmed. Once the recipient claims the gift, we&rsquo;ll ensure their Trump
+              Account is funded and then they can redeem their gift card.
             </p>
             {state.order && (
-              <p className="mt-4 text-xs uppercase tracking-wider text-white/40">
-                Order <span className="font-mono normal-case text-white/70">{state.order}</span>
-              </p>
+              <div className="mt-5">
+                <OrderView orderId={state.order} />
+              </div>
             )}
+            <p className="mt-5 text-xs text-white/40">
+              A confirmation email with a link to check your gift status is on its way.
+            </p>
           </>
         ) : (
           <>

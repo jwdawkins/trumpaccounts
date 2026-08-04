@@ -46,6 +46,7 @@ export const handler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (event) 
   try {
     const { order, cards } = buildOrderFromCart(buyerId, items, {
       fromName,
+      buyerEmail: claimEmail,
       acknowledgedAt: new Date().toISOString(),
       ackVersion: ackVersion ?? "v1",
     });

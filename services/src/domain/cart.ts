@@ -18,6 +18,8 @@ export interface CartItemInput {
   deliveryMethod: DeliveryMethod;
   recipientEmail?: string;
   recipientPhone?: string;
+  /** Scheduled send date (YYYY-MM-DD) — when the email/text goes out. */
+  sendDate?: string;
 }
 
 /** Resolve the mode: explicit if given, else VERIFIED when a name is present. */
@@ -82,6 +84,8 @@ export interface BuildOrderOptions {
   now?: Date;
   /** Resolved gifter display name (typed name, login name, or email). */
   fromName?: string;
+  /** Buyer's email (from the JWT) — used to send the order-summary email. */
+  buyerEmail?: string;
   /** Timestamp the buyer acknowledged the irrevocable contribution (§9/O5). */
   acknowledgedAt?: string;
   ackVersion?: string;
@@ -129,6 +133,7 @@ export function buildOrderFromCart(
       deliveryMethod: item.deliveryMethod,
       recipientEmail: item.recipientEmail,
       recipientPhone: item.recipientPhone,
+      sendDate: item.deliveryMethod === "SELF" ? undefined : item.sendDate,
       state: CardState.PENDING_PAYMENT,
       giftCardLeg: is100 ? GiftCardLeg.NONE : GiftCardLeg.AWAITING_SELECTION,
       trumpLeg: TrumpLeg.UNLINKED,
@@ -142,6 +147,7 @@ export function buildOrderFromCart(
   const order: Order = {
     orderId,
     buyerId,
+    buyerEmail: opts.buyerEmail,
     totalAmount,
     processingFeeCents: processingFeeCents(totalAmount, cards.length),
     status: "PENDING_PAYMENT",

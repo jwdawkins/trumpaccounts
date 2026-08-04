@@ -39,6 +39,7 @@ export function CheckoutDialog({ onClose }: { onClose: () => void }) {
           deliveryMethod: l.deliveryMethod ?? "SELF",
           recipientEmail: l.recipientEmail,
           recipientPhone: l.recipientPhone,
+          sendDate: l.sendDate,
         }));
         const order = await api.createOrder(items, true, fromName.trim() || undefined);
         const { url } = await api.checkout(order.orderId);

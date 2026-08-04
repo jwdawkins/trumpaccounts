@@ -3,6 +3,8 @@ import { Repo } from "../data/repo";
 import { PaymentEvent } from "../payments/provider";
 import { markOrderPaidAndOpenCards } from "../fulfillment/on-paid";
 import { dispatchDelivery } from "../fulfillment/deliver";
+import { buildOrderSummaryHtml } from "../notify/email";
+import { sendBrevoEmail } from "../notify/brevo";
 import { CardState, isTerminal } from "../domain/states";
 import { newEventId } from "../domain/tokens";
 
@@ -54,6 +56,31 @@ async function handleCheckoutCompleted(
   });
   for (const { card, token } of issued) {
     await dispatchDelivery(card, token, WEB_BASE_URL);
+  }
+
+  // One order-summary email to the buyer, with a status link. Best-effort — a
+  // failure here must not fail the webhook (fulfillment already succeeded).
+  if (found.order.buyerEmail) {
+    try {
+      await sendBrevoEmail({
+        to: found.order.buyerEmail,
+        subject: "Your gift order is confirmed",
+        html: buildOrderSummaryHtml({
+          statusUrl: `${WEB_BASE_URL.replace(/\/$/, "")}/orders/${found.order.orderId}`,
+          cards: found.cards.map((c) => ({
+            recipientName: c.recipientName,
+            amountCents: c.totalAmount,
+            brandName: c.brandName,
+            deliveryMethod: c.deliveryMethod,
+            recipientEmail: c.recipientEmail,
+            recipientPhone: c.recipientPhone,
+            sendDate: c.sendDate,
+          })),
+        }),
+      });
+    } catch (e) {
+      console.warn(JSON.stringify({ msg: "buyer summary email failed", orderId: found.order.orderId, error: (e as Error).message }));
+    }
   }
 }
 

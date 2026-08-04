@@ -260,18 +260,19 @@ export function CardConfigurator() {
       return deliveryMethod === "EMAIL" ? { recipientEmail: v } : { recipientPhone: v };
     };
     const messageFor = (i: number) => (individual ? cardMessages[i] ?? "" : message).trim() || undefined;
-    // TODO(send-date): scheduled send date is collected in the UI (sendDate /
-    // cardDates) but not yet passed here. Thread it into GiftDraft → CartItemInput
-    // → POST /orders and the funding/dispatch worker so sends fire on that date.
-    // const dateFor = (i: number) => (individual ? cardDates[i] : sendDate) || undefined;
+    // Scheduled send date: per-card when addressing individually, else the shared
+    // date. Only meaningful for email/text (SELF has no scheduled send).
+    const dateFor = (i: number) =>
+      deliveryMethod === "SELF" ? undefined : (individual ? cardDates[i] ?? today : sendDate) || undefined;
 
     // VERIFIED → one card per name; OPEN → `quantity` identical cards.
     if (verificationMode === "VERIFIED") {
       recipientNames.forEach((name, i) =>
-        add({ ...base, recipientName: name.trim(), ...contactFor(i), message: messageFor(i) }),
+        add({ ...base, recipientName: name.trim(), ...contactFor(i), message: messageFor(i), sendDate: dateFor(i) }),
       );
     } else {
-      for (let i = 0; i < quantity; i++) add({ ...base, ...contactFor(i), message: messageFor(i) });
+      for (let i = 0; i < quantity; i++)
+        add({ ...base, ...contactFor(i), message: messageFor(i), sendDate: dateFor(i) });
     }
     toast({
       title: cardCount > 1 ? `${cardCount} cards added to cart` : "Added to cart",

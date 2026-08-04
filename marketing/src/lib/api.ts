@@ -26,6 +26,8 @@ export interface GiftDraft {
   recipientName?: string;
   recipientEmail?: string;
   recipientPhone?: string;
+  /** Scheduled send date (YYYY-MM-DD) — when the email/text goes out. */
+  sendDate?: string;
 }
 
 /** The full order line sent to POST /orders (draft + recipient details). */
@@ -40,6 +42,7 @@ export interface CartItemInput {
   deliveryMethod: DeliveryMethod;
   recipientEmail?: string;
   recipientPhone?: string;
+  sendDate?: string;
 }
 
 export interface CreateOrderResult {
@@ -47,6 +50,35 @@ export interface CreateOrderResult {
   totalAmount: number;
   cardIds: string[];
   status: string;
+}
+
+/** A card as returned by GET /orders/{id} for the confirmation screen. */
+export interface OrderCard {
+  cardId: string;
+  totalAmount: number;
+  trumpPercent: number;
+  trumpAmount: number;
+  giftCardAmount: number;
+  brandName?: string;
+  verificationMode?: VerificationMode;
+  recipientName?: string;
+  recipientEmail?: string;
+  recipientPhone?: string;
+  deliveryMethod: DeliveryMethod;
+  sendDate?: string;
+  status: string;
+  state: string;
+  claimedAt?: string;
+  hasCertificate: boolean;
+}
+
+export interface OrderDetail {
+  orderId: string;
+  status: string;
+  totalAmount: number;
+  processingFeeCents: number;
+  createdAt: string;
+  cards: OrderCard[];
 }
 
 export interface CatalogProduct {
@@ -102,6 +134,21 @@ export async function getCatalog(): Promise<CatalogProduct[]> {
   }
 }
 
+/** Fetch an authed binary (PDF/zip) and trigger a browser download. */
+export async function downloadAuthedFile(path: string, filename: string): Promise<void> {
+  const res = await fetch(`${config.apiUrl}${path}`, { headers: { ...(await authHeader()) } });
+  if (!res.ok) throw new Error(`Download failed (HTTP ${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   createOrder: (items: CartItemInput[], acknowledged: boolean, fromName?: string) =>
     req<CreateOrderResult>("/orders", {
@@ -113,4 +160,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ orderId }),
     }),
+  getOrder: (orderId: string) => req<OrderDetail>(`/orders/${orderId}`),
+  sendGiftEmail: (cardId: string, email: string) =>
+    req<{ ok: true }>(`/cards/${cardId}/send-email`, {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  // Download paths (authed) for use with downloadAuthedFile.
+  cardCertPath: (cardId: string) => `/cards/${cardId}/certificate`,
+  orderCombinedPdfPath: (orderId: string) => `/orders/${orderId}/certificate`,
+  orderZipPath: (orderId: string) => `/orders/${orderId}/certificates.zip`,
 };

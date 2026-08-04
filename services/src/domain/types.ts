@@ -18,6 +18,8 @@ export type OrderStatus = "PENDING_PAYMENT" | "PAID" | "REFUNDED" | "CANCELLED";
 export interface Order {
   readonly orderId: string;
   readonly buyerId: string;
+  /** Buyer's email (from the JWT at checkout) — for the order-summary email. */
+  readonly buyerEmail?: string;
   readonly stripePaymentIntentId?: string;
   readonly stripeCheckoutSessionId?: string;
   /** Sum of all card totals (gift subtotal), integer cents. */
@@ -62,6 +64,8 @@ export interface Card {
   readonly message?: string;
   readonly deliveryMethod: DeliveryMethod;
   readonly recipientEmail?: string;
+  /** Scheduled send date (YYYY-MM-DD) — when the email/text goes out. */
+  readonly sendDate?: string;
   readonly recipientPhone?: string;
 
   // State machine (§4).

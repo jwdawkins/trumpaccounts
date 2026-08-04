@@ -89,6 +89,14 @@ export class ApiStack extends Stack {
       },
     });
 
+    // Brevo transactional-email secret lives in the auth stack; reference it by
+    // name so the buyer-summary + on-demand-send Lambdas can read it.
+    const brevoSecret = secretsmanager.Secret.fromSecretNameV2(
+      this,
+      "BrevoSecretRef",
+      `${APP_NAME}-${cfg.stage}-brevo`,
+    );
+
     // Webhook buffer (FIFO so eventId dedup + ordering hold) with a DLQ.
     const webhookDlq = new sqs.Queue(this, "WebhookDlq", {
       queueName: `${APP_NAME}-${cfg.stage}-webhooks-dlq.fifo`,
@@ -174,6 +182,7 @@ export class ApiStack extends Stack {
     // --- HTTP handlers ---
     const createOrderFn = makeFn("CreateOrderFn", "create-order.ts");
     const listOrdersFn = makeFn("ListOrdersFn", "list-orders.ts");
+    const getOrderFn = makeFn("GetOrderFn", "get-order.ts");
     const checkoutFn = makeFn("CheckoutFn", "checkout.ts", {
       STRIPE_SECRET_ARN: this.stripeSecret.secretArn,
       WEB_BASE_URL: webBaseUrl,
@@ -186,6 +195,7 @@ export class ApiStack extends Stack {
       WEB_BASE_URL: webBaseUrl,
       SES_FROM_ADDRESS: cfg.sesFromAddress,
       ASSETS_BUCKET: assetsBucket.bucketName,
+      BREVO_SECRET_ARN: brevoSecret.secretArn,
     });
     webhookProcessorFn.addEventSource(
       new SqsEventSource(webhookQueue, { batchSize: 10, reportBatchItemFailures: true }),
@@ -193,6 +203,16 @@ export class ApiStack extends Stack {
 
     const getCertificateFn = makeFn("GetCertificateFn", "get-certificate.ts", {
       ASSETS_BUCKET: assetsBucket.bucketName,
+    });
+    const orderCertificateFn = makeFn("OrderCertificateFn", "order-certificate.ts", {
+      ASSETS_BUCKET: assetsBucket.bucketName,
+    });
+    const orderCertZipFn = makeFn("OrderCertZipFn", "order-certificates-zip.ts", {
+      ASSETS_BUCKET: assetsBucket.bucketName,
+    });
+    const sendGiftEmailFn = makeFn("SendGiftEmailFn", "send-gift-email.ts", {
+      ASSETS_BUCKET: assetsBucket.bucketName,
+      BREVO_SECRET_ARN: brevoSecret.secretArn,
     });
 
     // Read-only catalog env — only the synchronous web/claim paths get this.
@@ -273,9 +293,13 @@ export class ApiStack extends Stack {
     // --- least-privilege grants ---
     table.grantReadWriteData(createOrderFn);
     table.grantReadData(listOrdersFn);
+    table.grantReadData(getOrderFn);
     table.grantReadWriteData(checkoutFn);
     table.grantReadWriteData(webhookProcessorFn);
     table.grantReadData(getCertificateFn);
+    table.grantReadData(orderCertificateFn);
+    table.grantReadData(orderCertZipFn);
+    table.grantReadData(sendGiftEmailFn);
     table.grantReadData(claimAuthorizerFn);
     table.grantReadData(claimDetailsFn);
     table.grantReadData(claimCatalogFn);
@@ -307,6 +331,11 @@ export class ApiStack extends Stack {
     webhookQueue.grantSendMessages(webhookReceiverFn);
     assetsBucket.grantPut(webhookProcessorFn);
     assetsBucket.grantRead(getCertificateFn);
+    assetsBucket.grantRead(orderCertificateFn);
+    assetsBucket.grantRead(orderCertZipFn);
+    assetsBucket.grantRead(sendGiftEmailFn);
+    brevoSecret.grantRead(sendGiftEmailFn);
+    brevoSecret.grantRead(webhookProcessorFn);
     // SES send, scoped to the verified sender identity.
     webhookProcessorFn.addToRolePolicy(
       new iam.PolicyStatement({
@@ -352,6 +381,12 @@ export class ApiStack extends Stack {
       authorizer,
     });
     this.httpApi.addRoutes({
+      path: "/orders/{orderId}",
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration("GetOrderInt", getOrderFn),
+      authorizer,
+    });
+    this.httpApi.addRoutes({
       path: "/checkout",
       methods: [HttpMethod.POST],
       integration: new HttpLambdaIntegration("CheckoutInt", checkoutFn),
@@ -361,6 +396,24 @@ export class ApiStack extends Stack {
       path: "/cards/{cardId}/certificate",
       methods: [HttpMethod.GET],
       integration: new HttpLambdaIntegration("GetCertificateInt", getCertificateFn),
+      authorizer,
+    });
+    this.httpApi.addRoutes({
+      path: "/orders/{orderId}/certificate",
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration("OrderCertificateInt", orderCertificateFn),
+      authorizer,
+    });
+    this.httpApi.addRoutes({
+      path: "/orders/{orderId}/certificates.zip",
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration("OrderCertZipInt", orderCertZipFn),
+      authorizer,
+    });
+    this.httpApi.addRoutes({
+      path: "/cards/{cardId}/send-email",
+      methods: [HttpMethod.POST],
+      integration: new HttpLambdaIntegration("SendGiftEmailInt", sendGiftEmailFn),
       authorizer,
     });
     // Recipient claim routes — claim-token auth (no Cognito).
